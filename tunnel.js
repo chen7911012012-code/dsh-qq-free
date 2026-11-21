@@ -7,7 +7,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -105,6 +105,31 @@ export function createTunnel({ dataDir, getConfig, logger }) {
     restartTimer.unref?.()
   }
 
+  function acquireLock() {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const fd = openSync(lockFile(), 'wx')
+        closeSync(fd)
+        writeFileSync(lockFile(), 'pending', 'utf8')
+        return { owner: true }
+      } catch (error) {
+        if (!error || error.code !== 'EEXIST') return { owner: true }
+        let text = ''
+        try { text = readFileSync(lockFile(), 'utf8').trim() } catch { /* ignore */ }
+        const pid = Number.parseInt(text, 10)
+        if (Number.isFinite(pid) && pid > 0 && alive(pid)) return { adopt: pid }
+        try {
+          const age = Date.now() - statSync(lockFile()).mtimeMs
+          if (text === 'pending' && age < 15_000) return { busy: true }
+        } catch {
+          // ignore
+        }
+        try { unlinkSync(lockFile()) } catch { /* ignore */ }
+      }
+    }
+    return { busy: true }
+  }
+
   function start() {
     if (child !== null || adoptedPid > 0) return
     const config = getConfig()
@@ -114,22 +139,26 @@ export function createTunnel({ dataDir, getConfig, logger }) {
       return
     }
 
-    const existing = readPid()
-    if (existing > 0 && alive(existing)) {
-      // 旧的 cloudflared 还在运行，直接复用，地址保持稳定
-      adoptedPid = existing
+    const lock = acquireLock()
+    if (lock.adopt) {
+      adoptedPid = lock.adopt
       lastUrl = readUrl()
       lastError = ''
       startPolling()
-      logger.info(`qq-free tunnel: 复用已有隧道 PID ${existing}`)
+      logger.info(`qq-free tunnel: 复用已有隧道 PID ${lock.adopt}`)
       return
     }
-    try { unlinkSync(lockFile()) } catch { /* ignore */ }
+    if (lock.busy) {
+      lastError = '隧道正在启动，稍后自动重试'
+      scheduleRestart()
+      return
+    }
 
     const binary = resolveBinary()
     if (binary.length === 0) {
       lastError = '找不到 cloudflared.exe，请把 cloudflared 放到数据目录或填 tunnelBin'
       logger.warn(`qq-free tunnel: ${lastError}`)
+      try { unlinkSync(lockFile()) } catch { /* ignore */ }
       return
     }
     try {
@@ -146,6 +175,7 @@ export function createTunnel({ dataDir, getConfig, logger }) {
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error)
       child = null
+      try { unlinkSync(lockFile()) } catch { /* ignore */ }
       logger.warn(`qq-free tunnel: 启动失败 ${lastError}`)
       scheduleRestart()
       return
