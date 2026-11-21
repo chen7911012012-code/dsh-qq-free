@@ -125,6 +125,15 @@
 - 密码保存在本机 `.dsh/qq-free/config.json`，请用 HTTPS WebDAV
 - 只同步源码/文档，不同步 `.dsh` 里的配置、state、问答库
 
+## GitHub 仓库与自动同步
+
+- 原始仓库：https://github.com/chen7911012012-code/dsh-qq-free
+- 插件页：https://chen7911012012-code.github.io/dsh-qq-free/
+- 原作者：都有文明每天 · 3645411938@qq.com
+- 插件市场索引：https://chen7911012012-code.github.io/dsh-qq-free/market/index.json
+- 每次源码改动会先同步到坚果云 WebDAV；GitHub Actions `sync-webdav.yml` 每 5 分钟拉取一次并自动提交，因此 GitHub 仓库通常会在 5 分钟内跟上本地修改。
+- Release 由 `release.yml` 在打 `v*` tag 时自动构建并上传 tgz / portable zip / 安装说明。
+
 ## 配额与限制
 
 - 主动消息受 QQ 开放平台自身的频率和配额限制，超限时平台会返回错误码，面板会把原始错误显示出来。插件另有一层「每个会话每日上限」（默认 4 条），可在设置里调整。
