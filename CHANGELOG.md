@@ -1,5 +1,15 @@
 # 更新日志 / Changelog
 
+## 1.18.1
+
+- 修复隧道重复启动：用 `tunnel.pid` 锁保证只保留一个 cloudflared 进程。
+
+## 1.18.0
+
+- 远程网页支持自动启动公网隧道：插件启动时自动拉起 cloudflared，DSH/插件重启后自动恢复。
+- 隧道 URL 会显示在面板「远程发言网页」卡片里，cloudflared 退出后 8 秒自动重启。
+- 面板可勾选「自动启动公网隧道」，cloudflared 默认从数据目录或 `%TEMP%` 查找。
+
 ## 1.17.0
 
 - 新增「GitHub 更新」：面板可检查 GitHub 最新 Release、显示更新说明、下载最新 tgz 更新包。
