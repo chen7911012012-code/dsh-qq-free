@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url'
 import { createChatChannel } from './channel.js'
 import { createRemoteServer } from './remote.js'
 import { createCloudSync } from './cloud.js'
+import { createGitHubSync } from './github.js'
 
 export const name = 'qq-free'
 
@@ -87,6 +88,11 @@ const DEFAULT_CONFIG = {
   cloudUser: '',
   cloudPass: '',
   cloudAuto: true,
+  githubEnabled: false,
+  githubOwner: 'chen7911012012-code',
+  githubRepo: 'dsh-qq-free',
+  githubToken: '',
+  githubAuto: true,
 }
 
 const EDITABLE_KEYS = new Set(Object.keys(DEFAULT_CONFIG))
@@ -159,6 +165,8 @@ function pickConfig(input) {
     } else if (key === 'moderationEnabled') {
       out[key] = value === true || value === 'true'
     } else if (key === 'cloudEnabled' || key === 'cloudAuto') {
+      out[key] = value === true || value === 'true'
+    } else if (key === 'githubEnabled' || key === 'githubAuto') {
       out[key] = value === true || value === 'true'
     } else {
       out[key] = String(value).slice(0, key === 'appSecret' ? 256 : 4000)
@@ -1612,6 +1620,23 @@ export async function apply(ctx, config) {
       if (action === 'test') return cloud.test()
       return { status: cloud.status() }
     },
+    async github(body) {
+      const action = String(body.action ?? 'status')
+      if (action === 'save') {
+        const patch = {
+          githubEnabled: body.enabled === true,
+          githubOwner: String(body.owner ?? '').trim(),
+          githubRepo: String(body.repo ?? '').trim(),
+          githubAuto: body.auto !== false,
+        }
+        if (typeof body.token === 'string' && body.token.length > 0) patch.githubToken = body.token.trim()
+        if (body.clearToken === true) patch.githubToken = ''
+        saveConfigPatch(patch)
+        return { saved: true }
+      }
+      if (action === 'push') return githubSync.pushAll()
+      return { status: githubSync.status() }
+    },
   }
 
   const remoteServer = createRemoteServer({
@@ -1629,10 +1654,17 @@ export async function apply(ctx, config) {
     return () => remoteServer.stop()
   }, 'qq-free.remote')
 
+  const githubSync = createGitHubSync({
+    pluginDir: PLUGIN_DIR,
+    getConfig: () => liveConfig,
+    logger,
+  })
+
   const cloud = createCloudSync({
     pluginDir: PLUGIN_DIR,
     getConfig: () => liveConfig,
     logger,
+    onFileChange: (name) => githubSync.schedule(name),
   })
 
   ctx.effect(() => {
@@ -1879,6 +1911,7 @@ export async function apply(ctx, config) {
         ...remoteServer.status(),
       },
       cloud: cloud.status(),
+      github: githubSync.status(),
       members: state.members.slice(-200).map((item) => ({
         groupOpenid: item.groupOpenid,
         openid: item.openid,
@@ -2246,6 +2279,35 @@ export async function apply(ctx, config) {
           return
         }
         sendJson(res, 200, { ok: true, result: cloud.status(), state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/qq-free/github',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const action = String(body.action ?? 'status')
+        if (action === 'save') {
+          const patch = {
+            githubEnabled: body.enabled === true,
+            githubOwner: String(body.owner ?? '').trim(),
+            githubRepo: String(body.repo ?? '').trim(),
+            githubAuto: body.auto !== false,
+          }
+          if (typeof body.token === 'string' && body.token.length > 0) patch.githubToken = body.token.trim()
+          if (body.clearToken === true) patch.githubToken = ''
+          saveConfigPatch(patch)
+          sendJson(res, 200, { ok: true, state: snapshot() })
+          return
+        }
+        if (action === 'push') {
+          const result = await githubSync.pushAll()
+          sendJson(res, 200, { ok: true, result, state: snapshot() })
+          return
+        }
+        sendJson(res, 200, { ok: true, result: githubSync.status(), state: snapshot() })
       }),
     }))
 
