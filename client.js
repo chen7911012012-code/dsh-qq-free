@@ -317,6 +317,7 @@ window.__ModuleLoader__.load({
             enabled: data.remote.enabled === true,
             port: data.remote.port || 8788,
             token: data.remote.token || '',
+            tunnelEnabled: data.remote.tunnel?.enabled === true,
           })
         }
         if (modForm === null && data.moderation) {
@@ -618,6 +619,7 @@ window.__ModuleLoader__.load({
           enabled: remoteForm.enabled,
           port: Number(remoteForm.port) || 8788,
           token: remoteForm.token,
+          tunnelEnabled: remoteForm.tunnelEnabled === true,
           ...(regenerate ? { regenerate: true } : {}),
         }))
         if (result !== null) {
@@ -1273,6 +1275,12 @@ window.__ModuleLoader__.load({
                 h('span', { className: 'qqf-hint' },
                   data.remote?.running ? `运行中 · 端口 ${data.remote.port}` : '未运行')),
               data.remote?.lastError ? h('p', { className: 'qqf-hint' }, `最近错误：${data.remote.lastError}`) : null,
+              data.remote?.tunnel?.url
+                ? h('p', { className: 'qqf-mono' }, `公网隧道：${data.remote.tunnel.url}`)
+                : null,
+              data.remote?.tunnel?.lastError
+                ? h('p', { className: 'qqf-hint' }, `隧道错误：${data.remote.tunnel.lastError}`)
+                : null,
               data.remote?.urls && data.remote.urls.length > 0
                 ? h('div', null,
                   h('p', { className: 'qqf-hint' }, '用下面的地址打开（带 token，可直接复制到手机）：'),
