@@ -46,5 +46,7 @@
         githubAuto: true
         creatorMode: false
         ownerOpenid: ''
+        joinVerifyEnabled: false
+        joinVerifyGroups: []
         tunnelEnabled: false
         tunnelBin: ''
