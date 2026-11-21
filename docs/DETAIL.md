@@ -94,8 +94,12 @@
 
 安全提醒：
 
-- 页面是 **HTTP 明文**，token 就是密码；公网使用请套 Tailscale、Cloudflare Tunnel、frp 等加密通道，不要把 8788 裸暴露到公网。
-- Windows 防火墙需要放行入站 TCP 8788（首次启动可能弹窗）。
+- 默认是**局域网使用**：监听 `0.0.0.0:8788`，同一 Wi-Fi 的设备用 `http://<这台电脑的局域网IP>:8788/?token=...` 访问；Windows 防火墙需放行入站 TCP 8788。
+- 页面是 **HTTP 明文**，token 就是密码；**不要直接把 8788 端口转发/映射到公网**，否则 token 会裸奔。
+- 外网使用请安装下面任意一种：
+  1. **Tailscale（推荐）**：主机和手机都安装 Tailscale，登录同一账号，手机访问 `http://<主机 Tailscale IP>:8788/?token=...`；加密、不用端口转发。
+  2. **Cloudflare Tunnel**：主机安装 `cloudflared`，运行 `cloudflared tunnel --url http://127.0.0.1:8788`，会得到一个 `https://xxx.trycloudflare.com` 地址；要固定域名就做 named tunnel。
+  3. **frp / ngrok**：把 8788 映射到带 HTTPS 的公网地址，并设置强 token。
 - 换 token 后旧链接立即失效。
 
 ## 入群欢迎与群管理
