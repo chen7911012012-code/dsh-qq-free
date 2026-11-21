@@ -1013,7 +1013,6 @@ export async function apply(ctx, config) {
       '📥 新入群申请',
       `昵称：${name}`,
       `成员 openid：${entry.memberOpenid}`,
-      `群 openid：${entry.groupOpenid}`,
     ]
     const appliedAt = formatApplyTime(entry.applyAt)
     if (appliedAt.length > 0) lines.push(`申请时间：${appliedAt}`)
