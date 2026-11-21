@@ -1,20 +1,19 @@
 /**
- * 远程网页公网隧道：由插件自己拉起 cloudflared quick tunnel，
- * DSH/插件每次启动时自动恢复（前提是 tunnelEnabled=true）。
- *
- * 不依赖外部 shell；URL 会写入状态，面板里能看到最新地址。
+ * 远程网页公网隧道：由插件自己拉起 cloudflared quick tunnel。
+ * 用 tunnel.pid 做单实例锁：插件/DSH 重启时优先复用仍在运行的旧隧道，
+ * 避免重复启动导致地址不停变化。
  *
  * @module @local/dsh-qq-free/tunnel
  */
 
-import { execFileSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 export function createTunnel({ dataDir, getConfig, logger }) {
   let child = null
-  let timer = null
+  let adoptedPid = 0
   let poller = null
   let restartTimer = null
   let lastUrl = ''
@@ -30,22 +29,23 @@ export function createTunnel({ dataDir, getConfig, logger }) {
     return join(dataDir, 'tunnel.pid')
   }
 
-  function killPrevious() {
-    // 插件自己管理 cloudflared：启动前清掉所有旧实例，避免 HMR/重启后残留多个隧道
-    try {
-      execFileSync('taskkill', ['/F', '/IM', 'cloudflared.exe'], { stdio: 'ignore', windowsHide: true })
-    } catch {
-      // 没有进程时会返回非 0
-    }
+  function readPid() {
     try {
       const pid = Number.parseInt(readFileSync(lockFile(), 'utf8').trim(), 10)
-      if (Number.isFinite(pid) && pid > 0) {
-        try { process.kill(pid) } catch { /* already gone */ }
-      }
+      return Number.isFinite(pid) && pid > 0 ? pid : 0
     } catch {
-      // no lock
+      return 0
     }
-    try { unlinkSync(lockFile()) } catch { /* ignore */ }
+  }
+
+  function alive(pid) {
+    if (!Number.isFinite(pid) || pid <= 0) return false
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
   }
 
   function resolveBinary() {
@@ -74,6 +74,25 @@ export function createTunnel({ dataDir, getConfig, logger }) {
     poller = null
   }
 
+  function startPolling() {
+    stopPolling()
+    poller = setInterval(() => {
+      if (adoptedPid > 0 && !alive(adoptedPid)) {
+        adoptedPid = 0
+        try { unlinkSync(lockFile()) } catch { /* ignore */ }
+        scheduleRestart()
+        return
+      }
+      const url = readUrl()
+      if (url.length > 0 && url !== lastUrl) {
+        lastUrl = url
+        lastError = ''
+        logger.info(`qq-free tunnel: ${url}`)
+      }
+    }, 1500)
+    poller.unref?.()
+  }
+
   function scheduleRestart() {
     if (stopping) return
     if (getConfig().tunnelEnabled !== true) return
@@ -87,13 +106,26 @@ export function createTunnel({ dataDir, getConfig, logger }) {
   }
 
   function start() {
-    if (child !== null) return
+    if (child !== null || adoptedPid > 0) return
     const config = getConfig()
     if (config.tunnelEnabled !== true) return
     if (config.webEnabled !== true) {
       lastError = '远程网页未启用，隧道不启动'
       return
     }
+
+    const existing = readPid()
+    if (existing > 0 && alive(existing)) {
+      // 旧的 cloudflared 还在运行，直接复用，地址保持稳定
+      adoptedPid = existing
+      lastUrl = readUrl()
+      lastError = ''
+      startPolling()
+      logger.info(`qq-free tunnel: 复用已有隧道 PID ${existing}`)
+      return
+    }
+    try { unlinkSync(lockFile()) } catch { /* ignore */ }
+
     const binary = resolveBinary()
     if (binary.length === 0) {
       lastError = '找不到 cloudflared.exe，请把 cloudflared 放到数据目录或填 tunnelBin'
@@ -105,7 +137,6 @@ export function createTunnel({ dataDir, getConfig, logger }) {
     } catch {
       // ignore
     }
-    killPrevious()
     lastError = ''
     try {
       child = spawn(binary, ['tunnel', '--url', 'http://127.0.0.1:8788', '--no-autoupdate', '--logfile', logFile()], {
@@ -131,8 +162,8 @@ export function createTunnel({ dataDir, getConfig, logger }) {
       child = null
       stopPolling()
       try {
-        const pid = Number.parseInt(readFileSync(lockFile(), 'utf8').trim(), 10)
-        if (!Number.isFinite(pid) || pid === exitedPid) unlinkSync(lockFile())
+        const pid = readPid()
+        if (pid === 0 || pid === exitedPid) unlinkSync(lockFile())
       } catch {
         // ignore
       }
@@ -141,48 +172,34 @@ export function createTunnel({ dataDir, getConfig, logger }) {
         scheduleRestart()
       }
     })
-    stopPolling()
-    poller = setInterval(() => {
-      const url = readUrl()
-      if (url.length > 0 && url !== lastUrl) {
-        lastUrl = url
-        lastError = ''
-        logger.info(`qq-free tunnel: ${url}`)
-      }
-    }, 1500)
-    poller.unref?.()
+    startPolling()
     logger.info('qq-free tunnel: 已启动 cloudflared')
   }
 
-  function stop() {
-    stopping = true
+  function stop(killTunnel = false) {
     stopPolling()
     if (restartTimer !== null) clearTimeout(restartTimer)
     restartTimer = null
-    if (child !== null) {
-      try { child.kill() } catch { /* ignore */ }
-      child = null
+    if (killTunnel) {
+      const pid = child?.pid ?? adoptedPid
+      if (pid > 0) {
+        try { process.kill(pid) } catch { /* ignore */ }
+      }
+      try { unlinkSync(lockFile()) } catch { /* ignore */ }
     }
-    try {
-      execFileSync('taskkill', ['/F', '/IM', 'cloudflared.exe'], { stdio: 'ignore', windowsHide: true })
-    } catch {
-      // ignore
-    }
-    try { unlinkSync(lockFile()) } catch { /* ignore */ }
-    stopping = false
+    child = null
+    adoptedPid = 0
   }
 
   return {
     start,
     stop,
-    refresh() {
-      lastUrl = readUrl() || lastUrl
-      return this.status()
-    },
     status() {
+      const pid = adoptedPid > 0 ? adoptedPid : readPid()
+      const running = child !== null || (pid > 0 && alive(pid))
       return {
         enabled: getConfig().tunnelEnabled === true,
-        running: child !== null,
+        running,
         url: lastUrl || readUrl(),
         restarts,
         lastError,
