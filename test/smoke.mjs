@@ -201,7 +201,7 @@ await module.apply(ctx, {
   quietHoursStart: '23:00',
   quietHoursEnd: '08:00',
 })
-check('注册了 21 条 HTTP 路由', routes.size === 21, [...routes.keys()].join(', '))
+check('注册了 22 条 HTTP 路由', routes.size === 22, [...routes.keys()].join(', '))
 check('注册了 3 个工具', tools.length === 3)
 const qaGuidance = sections.find((section) => section.name === 'qq-free:qa-guidance')
 const qaLibrary = sections.find((section) => section.name === 'qq-free:qa-library')
@@ -546,6 +546,18 @@ if (ws) {
   await sleep(150)
   const infoReply = sent.slice(beforeInfo).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-INFO')
   check('@某人 获取信息显示 openid 和入群时间', Boolean(infoReply) && infoReply.body.content.includes('openid：TARGET123456') && infoReply.body.content.includes('入群时间'))
+
+  result = await call('/qq-free/announcements', 'POST', {
+    action: 'save', name: '测试公告', groupOpenids: [GROUP], date: '', time: '09:00', text: '重要通知', enabled: true,
+  })
+  check('保存定时群公告', result.status === 200 && Array.isArray(result.body.state.announcements) && result.body.state.announcements.length === 1)
+  const annId = result.body.state.announcements[0].id
+  const beforeAnn = sent.length
+  result = await call('/qq-free/announcements', 'POST', { action: 'run', id: annId })
+  const annMessage = sent.slice(beforeAnn).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`))
+  check('定时公告 @所有人 发送', result.status === 200 && annMessage?.body?.msg_type === 2 && annMessage?.body?.markdown?.content.includes('<qqbot-at-everyone />'), JSON.stringify(annMessage?.body))
+  result = await call('/qq-free/announcements', 'POST', { action: 'remove', id: annId })
+  check('删除定时公告', result.status === 200 && result.body.state.announcements.length === 0)
 
   result = await call('/qq-free/group-blocks', 'POST', { action: 'save', groupOpenid: GROUP, all: true, features: [] })
   check('保存群全部屏蔽', result.status === 200 && result.body.state.groupBlocks.some((entry) => entry.groupOpenid === GROUP && entry.all === true))
