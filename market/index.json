@@ -83,7 +83,7 @@
           "source": {
             "type": "git",
             "url": "https://github.com/chen7911012012-code/dsh-qq-free",
-            "commit": "983369da098b5bfaeb3ca7c5c98449e6da2e2bbf"
+            "commit": "b8158663e85be5cf367f82241f7ffdeee5a84cb0"
           },
           "engines": {}
         }
