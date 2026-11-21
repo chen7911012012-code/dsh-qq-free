@@ -44,3 +44,4 @@
         githubRepo: 'dsh-qq-free'
         githubToken: ''
         githubAuto: true
+        creatorMode: false
