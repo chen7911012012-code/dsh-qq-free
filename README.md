@@ -42,7 +42,7 @@ npx @deepseek-ai/dsh plugin --profile <profile> add https://github.com/chen79110
 在本机 DSH 的插件市场源里加入：
 
 ```
-https://raw.githubusercontent.com/chen7911012012-code/dsh-qq-free/main/market/index.json
+https://chen7911012012-code.github.io/dsh-qq-free/market/index.json
 ```
 
 然后在「插件 → 发现」里搜索「QQ 自动发言」即可一键安装。
