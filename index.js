@@ -23,6 +23,7 @@ import { createChatChannel } from './channel.js'
 import { createRemoteServer } from './remote.js'
 import { createCloudSync } from './cloud.js'
 import { createGitHubSync } from './github.js'
+import { createTunnel } from './tunnel.js'
 
 export const name = 'qq-free'
 
@@ -101,6 +102,8 @@ const DEFAULT_CONFIG = {
   githubToken: '',
   githubAuto: true,
   creatorMode: false,
+  tunnelEnabled: false,
+  tunnelBin: '',
 }
 
 const EDITABLE_KEYS = new Set(Object.keys(DEFAULT_CONFIG))
@@ -177,6 +180,8 @@ function pickConfig(input) {
     } else if (key === 'githubEnabled' || key === 'githubAuto') {
       out[key] = value === true || value === 'true'
     } else if (key === 'creatorMode') {
+      out[key] = value === true || value === 'true'
+    } else if (key === 'tunnelEnabled') {
       out[key] = value === true || value === 'true'
     } else {
       out[key] = String(value).slice(0, key === 'appSecret' ? 256 : 4000)
@@ -1811,6 +1816,24 @@ export async function apply(ctx, config) {
     if (liveConfig.webEnabled) remoteServer.start()
     return () => remoteServer.stop()
   }, 'qq-free.remote')
+
+  const tunnel = createTunnel({
+    dataDir: DATA_DIR,
+    getConfig: () => liveConfig,
+    logger,
+  })
+
+  ctx.effect(() => {
+    let timer = null
+    if (liveConfig.tunnelEnabled) {
+      timer = setTimeout(() => tunnel.start(), 1200)
+      timer.unref?.()
+    }
+    return () => {
+      if (timer !== null) clearTimeout(timer)
+      tunnel.stop()
+    }
+  }, 'qq-free.tunnel')
 
   const githubSync = createGitHubSync({
     pluginDir: PLUGIN_DIR,
