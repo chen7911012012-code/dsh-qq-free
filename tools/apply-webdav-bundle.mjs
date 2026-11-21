@@ -30,7 +30,7 @@ if (!bundle || typeof bundle.files !== 'object') {
   process.exit(1)
 }
 
-const SAFE = /^(index\.js|channel\.js|remote\.js|remote-page\.js|client\.js|cloud\.js|package\.json|cordis\.patch\.yml|icon\.svg|README\.md|LICENSE|NOTICE\.md|AUTHORS\.md|docs\/|locale\/|tools\/)/
+const SAFE = /^(index\.js|channel\.js|remote\.js|remote-page\.js|client\.js|cloud\.js|github\.js|package\.json|cordis\.patch\.yml|icon\.svg|README\.md|LICENSE|NOTICE\.md|AUTHORS\.md|CHANGELOG\.md|docs\/|locale\/|tools\/)/
 let written = 0
 for (const [file, base64] of Object.entries(bundle.files)) {
   const relative = String(file).replace(/\\/g, '/')
