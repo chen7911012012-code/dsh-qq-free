@@ -1595,7 +1595,7 @@ export async function apply(ctx, config) {
     return { list: state.announcements }
   }
 
-
+  async function handleGroupAdmin(body) {
     const action = String(body.action ?? '')
     const groupOpenid = assertGroupOpenid(body.groupOpenid)
     const groupPath = `/v2/groups/${encodeURIComponent(groupOpenid)}`
