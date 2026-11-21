@@ -1415,7 +1415,7 @@ window.__ModuleLoader__.load({
                 }, kickArmed ? '确认踢出' : '踢出'),
                 kickArmed ? h('button', { className: 'qqf-btn qqf-btn--sm', onClick: () => setKickArmed(false) }, '取消') : null)),
 
-            h(Card, {
+            creatorCard({
               title: '云端同步（WebDAV）',
               wide: true,
               hint: '把插件源码打包上传到 WebDAV 网盘；其他电脑填同一个地址/账号后点「从云端恢复」。文件改动后会自动上传（需勾选自动）。密码保存在本机 config.json，建议用 HTTPS。',
@@ -1459,7 +1459,7 @@ window.__ModuleLoader__.load({
                   : '还没有同步记录'),
               data.cloud?.lastError ? h('p', { className: 'qqf-hint' }, `最近错误：${data.cloud.lastError}`) : null),
 
-            h(Card, {
+            creatorCard({
               title: 'GitHub 直连同步',
               wide: true,
               hint: '源码改动后约 3 秒直接提交到 GitHub（Contents API），不依赖 git 命令；和 WebDAV / Actions 互为兜底。token 只存在本机 config.json 里。',
