@@ -103,6 +103,8 @@ const DEFAULT_CONFIG = {
   githubAuto: true,
   creatorMode: false,
   ownerOpenid: '',
+  joinVerifyEnabled: false,
+  joinVerifyGroups: [],
   tunnelEnabled: false,
   tunnelBin: '',
 }
@@ -170,11 +172,16 @@ function pickConfig(input) {
     } else if (key === 'moderationGroups' || key === 'bannedWords') {
       const list = Array.isArray(value) ? value : String(value).split(/[\n,，、]+/)
       out[key] = list.map((item) => String(item).trim()).filter(Boolean).slice(0, key === 'bannedWords' ? 500 : 30)
+    } else if (key === 'joinVerifyGroups') {
+      const list = Array.isArray(value) ? value : String(value).split(/[\n,，、\s]+/)
+      out[key] = list.map((item) => String(item).trim()).filter(Boolean).slice(0, 30)
     } else if (key === 'moderationMuteMinutes') {
       const minutes = Number(value)
       if (!Number.isFinite(minutes)) continue
       out[key] = Math.max(1, Math.min(43200, Math.round(minutes)))
     } else if (key === 'moderationEnabled') {
+      out[key] = value === true || value === 'true'
+    } else if (key === 'joinVerifyEnabled') {
       out[key] = value === true || value === 'true'
     } else if (key === 'cloudEnabled' || key === 'cloudAuto') {
       out[key] = value === true || value === 'true'
