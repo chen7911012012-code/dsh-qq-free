@@ -269,7 +269,16 @@ export async function apply(ctx, config) {
   state.usage = state.usage !== null && typeof state.usage === 'object' ? state.usage : {}
   state.lastAutoAt = Number(state.lastAutoAt) || 0
   state.lastError = typeof state.lastError === 'string' ? state.lastError : ''
-  state.pendingJoins = Array.isArray(state.pendingJoins) ? state.pendingJoins.slice(-50) : []
+  if (Array.isArray(state.pendingJoins)) {
+    const uniqueJoins = new Map()
+    for (const entry of state.pendingJoins) {
+      if (!entry || typeof entry !== 'object') continue
+      uniqueJoins.set(`${entry.groupOpenid}:${entry.memberOpenid}`, entry)
+    }
+    state.pendingJoins = [...uniqueJoins.values()].slice(-50)
+  } else {
+    state.pendingJoins = []
+  }
   state.chatLog = Array.isArray(state.chatLog) ? state.chatLog.slice(-200) : []
   state.lastApproval = state.lastApproval && typeof state.lastApproval === 'object' ? state.lastApproval : null
   state.members = Array.isArray(state.members)
@@ -990,11 +999,16 @@ export async function apply(ctx, config) {
       receivedAt: new Date().toISOString(),
     }
     if (entry.groupOpenid.length === 0 || entry.memberOpenid.length === 0) return
-    const key = entry.joinRequestId.length > 0 ? entry.joinRequestId : `${entry.groupOpenid}:${entry.memberOpenid}`
-    state.pendingJoins = state.pendingJoins.filter((item) => {
-      const itemKey = String(item.joinRequestId ?? '').length > 0 ? item.joinRequestId : `${item.groupOpenid}:${item.memberOpenid}`
-      return itemKey !== key
-    })
+    const existing = state.pendingJoins.find((item) => item.groupOpenid === entry.groupOpenid && item.memberOpenid === entry.memberOpenid)
+    if (existing) {
+      // 同一个 QQ 在同一个群只保留一条申请：更新为最新一次申请
+      const receivedAt = existing.receivedAt
+      Object.assign(existing, entry)
+      existing.receivedAt = receivedAt || entry.receivedAt
+      persistState()
+      logger.info(`qq-free: 更新入群申请 ${entry.username || entry.memberOpenid}`)
+      return
+    }
     state.pendingJoins.push(entry)
     state.pendingJoins = state.pendingJoins.slice(-50)
     persistState()
@@ -1375,9 +1389,9 @@ export async function apply(ctx, config) {
         const memberOpenid = String(item.member_openid ?? '')
         if (memberOpenid.length === 0) continue
         const existing = state.pendingJoins.find((entry) => entry.groupOpenid === groupOpenid
-          && ((joinRequestId.length > 0 && entry.joinRequestId === joinRequestId)
-            || (joinRequestId.length === 0 && entry.memberOpenid === memberOpenid)))
+          && entry.memberOpenid === memberOpenid)
         if (existing) {
+          existing.joinRequestId = joinRequestId
           existing.username = String(item.username ?? existing.username)
           existing.applyAt = String(item.apply_at ?? existing.applyAt)
           existing.verifyMessage = String(item.verify_info?.verify_message ?? existing.verifyMessage ?? '')
