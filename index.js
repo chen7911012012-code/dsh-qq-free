@@ -664,6 +664,7 @@ export async function apply(ctx, config) {
     const base = String(cfg.apiBase || 'https://api.sgroup.qq.com').replace(/\/+$/, '')
     const path = target.scope === 'c2c' ? `/v2/users/${encodeURIComponent(target.openid)}/messages` : `/v2/groups/${encodeURIComponent(target.openid)}/messages`
     const mention = target.scope === 'group' ? String(meta.mention ?? '').trim() : ''
+    const everyone = target.scope === 'group' && meta.everyone === true
     if (mention.length > 0 && !/^[A-Za-z0-9_-]{8,}$/.test(mention)) throw new Error('@成员 openid 不合法')
     const mentionName = mention.length > 0
       ? (state.members.find((item) => item.groupOpenid === target.openid && item.openid === mention)?.name ?? '')
@@ -682,9 +683,11 @@ export async function apply(ctx, config) {
     let raw = ''
     let body = null
     try {
-      const payload = mention.length > 0
-        ? { markdown: { content: `<qqbot-at-user id="${mention}"/> ${trimmed}` }, msg_type: 2 }
-        : { content: trimmed, msg_type: 0 }
+      const payload = everyone
+        ? { markdown: { content: `<qqbot-at-everyone /> ${trimmed}` }, msg_type: 2 }
+        : mention.length > 0
+          ? { markdown: { content: `<qqbot-at-user id="${mention}"/> ${trimmed}` }, msg_type: 2 }
+          : { content: trimmed, msg_type: 0 }
       response = await post(payload)
       raw = await response.text()
       try {
@@ -692,8 +695,8 @@ export async function apply(ctx, config) {
       } catch {
         body = null
       }
-      // Markdown @ 不可用时退化成「@昵称」文字，至少把消息发出去
-      if (!response.ok && mention.length > 0) {
+      // Markdown @ 不可用时退化成「@昵称」文字，至少把消息发出去（@全体不降级，避免假装 @ 了所有人）
+      if (!response.ok && mention.length > 0 && !everyone) {
         response = await post({ content: mentionName ? `@${mentionName} ${trimmed}` : trimmed, msg_type: 0 })
         raw = await response.text()
         try {
