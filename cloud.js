@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path'
 
 const BUNDLE_NAME = 'dsh-qq-free-bundle.json'
 const ROOT_FILES = [
-  'index.js', 'channel.js', 'remote.js', 'remote-page.js', 'client.js', 'cloud.js',
+  'index.js', 'channel.js', 'remote.js', 'remote-page.js', 'client.js', 'cloud.js', 'github.js',
   'package.json', 'cordis.patch.yml', 'icon.svg', 'README.md',
   'LICENSE', 'NOTICE.md', 'AUTHORS.md',
 ]
@@ -52,7 +52,7 @@ function collectFiles(pluginDir) {
 function safeRelative(path) {
   const value = String(path ?? '').replace(/\\/g, '/')
   if (value.startsWith('/') || value.includes('..') || value.length === 0) return null
-  if (!/^(index\.js|channel\.js|remote\.js|remote-page\.js|client\.js|cloud\.js|package\.json|cordis\.patch\.yml|icon\.svg|README\.md|LICENSE|NOTICE\.md|AUTHORS\.md|docs\/|locale\/|tools\/)/.test(value)) return null
+  if (!/^(index\.js|channel\.js|remote\.js|remote-page\.js|client\.js|cloud\.js|github\.js|package\.json|cordis\.patch\.yml|icon\.svg|README\.md|LICENSE|NOTICE\.md|AUTHORS\.md|docs\/|locale\/|tools\/)/.test(value)) return null
   return value
 }
 
@@ -60,7 +60,7 @@ function basicAuth(user, password) {
   return `Basic ${Buffer.from(`${user}:${password}`, 'utf8').toString('base64')}`
 }
 
-export function createCloudSync({ pluginDir, getConfig, logger }) {
+export function createCloudSync({ pluginDir, getConfig, logger, onFileChange }) {
   let watcher = null
   let timer = null
   let lastAt = ''
@@ -245,6 +245,7 @@ export function createCloudSync({ pluginDir, getConfig, logger }) {
         watcher = watch(pluginDir, { recursive: true }, (event, filename) => {
           const name = String(filename ?? '').replace(/\\/g, '/')
           if (name.length === 0 || name.startsWith('publish/') || name.startsWith('.git/') || name.includes('node_modules')) return
+          try { onFileChange?.(name) } catch { /* ignore */ }
           schedule()
         })
         watcher.on('error', () => {})
