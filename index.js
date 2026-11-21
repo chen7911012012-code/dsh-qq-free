@@ -2750,6 +2750,58 @@ export async function apply(ctx, config) {
 
     disposers.push(webServer.register({
       kind: 'exact',
+      path: '/qq-free/owner',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const ownerOpenid = String(body.ownerOpenid ?? '').trim()
+        if (ownerOpenid.length > 0 && !/^[A-Za-z0-9_-]{8,}$/.test(ownerOpenid)) throw new Error('主人 openid 不合法')
+        saveConfigPatch({ ownerOpenid })
+        sendJson(res, 200, { ok: true, state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/qq-free/group-managers',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const action = String(body.action ?? 'list')
+        if (action === 'save') {
+          const groupOpenid = assertGroupOpenid(body.groupOpenid)
+          const memberOpenid = assertMemberOpenid(body.memberOpenid)
+          const name = String(body.name ?? '').trim().slice(0, 60)
+          if (!isGroupDelegate(groupOpenid, memberOpenid)) {
+            state.groupManagers.push({ groupOpenid, memberOpenid, name, addedBy: 'panel', addedAt: new Date().toISOString() })
+            persistState()
+          }
+          sendJson(res, 200, { ok: true, state: snapshot() })
+          return
+        }
+        if (action === 'remove') {
+          state.groupManagers = state.groupManagers.filter((item) => !(item.groupOpenid === String(body.groupOpenid ?? '') && item.memberOpenid === String(body.memberOpenid ?? '')))
+          persistState()
+          sendJson(res, 200, { ok: true, state: snapshot() })
+          return
+        }
+        sendJson(res, 200, { ok: true, list: state.groupManagers, state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/qq-free/group-info',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const groupOpenid = assertGroupOpenid(body.groupOpenid)
+        sendJson(res, 200, { ok: true, text: await groupInfoReply(groupOpenid) })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
       path: '/qq-free/announcements',
       handler: route(async (req, res) => {
         if (!requirePost(req, res)) return
