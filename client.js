@@ -244,6 +244,7 @@ window.__ModuleLoader__.load({
       const [boardTargetIds, setBoardTargetIds] = useState([])
       const [modForm, setModForm] = useState(null)
       const [cloudForm, setCloudForm] = useState(null)
+      const [githubForm, setGithubForm] = useState(null)
       const [blockGroup, setBlockGroup] = useState('')
       const [blockMember, setBlockMember] = useState('')
       const [blockName, setBlockName] = useState('')
@@ -329,6 +330,15 @@ window.__ModuleLoader__.load({
             user: data.cloud.user || '',
             password: '',
             auto: data.cloud.auto === true,
+          })
+        }
+        if (githubForm === null && data.github) {
+          setGithubForm({
+            enabled: data.github.enabled === true,
+            owner: data.github.owner || 'chen7911012012-code',
+            repo: data.github.repo || 'dsh-qq-free',
+            token: '',
+            auto: data.github.auto === true,
           })
         }
         if (welcomeForm === null && data.welcome) {
@@ -718,6 +728,20 @@ window.__ModuleLoader__.load({
               : action === 'test' ? '云端连接成功'
                 : '云端同步设置已保存'
           flash('ok', message)
+        }
+      }
+
+      async function githubAction(action) {
+        const result = await run(`github-${action}`, () => request('/qq-free/github', action === 'save' ? {
+          action: 'save',
+          enabled: githubForm?.enabled === true,
+          owner: githubForm?.owner ?? '',
+          repo: githubForm?.repo ?? '',
+          token: githubForm?.token ?? '',
+          auto: githubForm?.auto !== false,
+        } : { action }))
+        if (result !== null) {
+          flash('ok', action === 'push' ? `已同步 ${result.result?.synced ?? 0} 个文件到 GitHub` : 'GitHub 同步设置已保存')
         }
       }
 
@@ -1406,6 +1430,47 @@ window.__ModuleLoader__.load({
                   ? `最近同步：${new Date(data.cloud.lastAt).toLocaleString('zh-CN', { hour12: false })} · ${data.cloud.lastAction || ''}`
                   : '还没有同步记录'),
               data.cloud?.lastError ? h('p', { className: 'qqf-hint' }, `最近错误：${data.cloud.lastError}`) : null),
+
+            h(Card, {
+              title: 'GitHub 直连同步',
+              wide: true,
+              hint: '源码改动后约 3 秒直接提交到 GitHub（Contents API），不依赖 git 命令；和 WebDAV / Actions 互为兜底。token 只存在本机 config.json 里。',
+            },
+              h('label', { className: 'qqf-row' },
+                h('input', {
+                  type: 'checkbox', checked: githubForm?.enabled ?? false,
+                  onChange: (event) => setGithubForm({ ...githubForm, enabled: event.target.checked }),
+                }),
+                h('span', null, '启用 GitHub 直连'),
+                h('input', {
+                  type: 'checkbox', checked: githubForm?.auto ?? true,
+                  onChange: (event) => setGithubForm({ ...githubForm, auto: event.target.checked }),
+                }),
+                h('span', null, '改动后自动提交')),
+              h('div', { className: 'qqf-row' },
+                h('input', {
+                  className: 'qqf-input qqf-grow', value: githubForm?.owner ?? '', placeholder: 'GitHub owner',
+                  onChange: (event) => setGithubForm({ ...githubForm, owner: event.target.value }),
+                }),
+                h('input', {
+                  className: 'qqf-input qqf-grow', value: githubForm?.repo ?? '', placeholder: '仓库名',
+                  onChange: (event) => setGithubForm({ ...githubForm, repo: event.target.value }),
+                })),
+              h('input', {
+                className: 'qqf-input', type: 'password', value: githubForm?.token ?? '',
+                placeholder: data.github?.hasToken ? 'token 已保存，留空不改' : 'GitHub token（repo/contents 权限）',
+                onChange: (event) => setGithubForm({ ...githubForm, token: event.target.value }),
+              }),
+              h('div', { className: 'qqf-row' },
+                h('button', { className: 'qqf-btn', disabled: busy !== '', onClick: () => void githubAction('save') },
+                  busy === 'github-save' ? '保存中…' : '保存'),
+                h('button', { className: 'qqf-btn', disabled: busy !== '', onClick: () => void githubAction('push') },
+                  busy === 'github-push' ? '同步中…' : '全量同步')),
+              h('p', { className: 'qqf-hint' },
+                data.github?.lastAt
+                  ? `最近同步：${new Date(data.github.lastAt).toLocaleString('zh-CN', { hour12: false })} · ${data.github.lastFile || data.github.lastAction || ''}`
+                  : '还没有同步记录'),
+              data.github?.lastError ? h('p', { className: 'qqf-hint' }, `最近错误：${data.github.lastError}`) : null),
 
             h(Card, {
               title: '群板块（一次发多个群）',
