@@ -45,3 +45,5 @@
         githubToken: ''
         githubAuto: true
         creatorMode: false
+        tunnelEnabled: false
+        tunnelBin: ''
