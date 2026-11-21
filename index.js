@@ -1393,7 +1393,7 @@ export async function apply(ctx, config) {
     if (isGroupFeatureBlocked(groupOpenid, 'info')) return null
     const mentions = Array.isArray(data.mentions) ? data.mentions : []
     const target = mentions.find((mention) => mention && mention.is_you !== true && mention.member_openid)
-    if (!target) return '请 @ 要查询的人，例如「@某人 获取信息」。'
+    if (!target) return null
     const memberOpenid = String(target.member_openid)
     let joinedAt = ''
     let username = String(target.username ?? '')
