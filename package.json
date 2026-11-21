@@ -32,6 +32,7 @@
     "cloud.js",
     "github.js",
     "tunnel.js",
+    "verification-image.js",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
