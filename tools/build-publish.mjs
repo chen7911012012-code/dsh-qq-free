@@ -30,7 +30,7 @@ mkdirSync(outDir, { recursive: true })
 mkdirSync(marketDir, { recursive: true })
 
 // 1. 复制运行时文件（不复制 test/、tools/、publish/）
-for (const entry of ['index.js', 'channel.js', 'remote.js', 'remote-page.js', 'cloud.js', 'github.js', 'tunnel.js', 'client.js', 'cordis.patch.yml', 'icon.svg', 'README.md', 'LICENSE', 'NOTICE.md', 'AUTHORS.md', 'CHANGELOG.md', 'docs', 'locale']) {
+for (const entry of ['index.js', 'channel.js', 'remote.js', 'remote-page.js', 'cloud.js', 'github.js', 'tunnel.js', 'verification-image.js', 'client.js', 'cordis.patch.yml', 'icon.svg', 'README.md', 'LICENSE', 'NOTICE.md', 'AUTHORS.md', 'CHANGELOG.md', 'docs', 'locale']) {
   cpSync(join(root, entry), join(outDir, entry), { recursive: true })
 }
 
@@ -72,6 +72,7 @@ const manifest = {
     'cloud.js',
     'github.js',
     'tunnel.js',
+    'verification-image.js',
     'client.js',
     'cordis.patch.yml',
     'locale/*.json',
