@@ -64,6 +64,7 @@ export function createChatChannel(deps) {
   const onGroupAllBlocked = deps.onGroupAllBlocked
   const onGroupFeatureBlocked = deps.onGroupFeatureBlocked
   const onInfoCommand = deps.onInfoCommand
+  const onVerifyCode = deps.onVerifyCode
   const logger = deps.logger ?? console
 
   let socket = null
@@ -385,6 +386,22 @@ export function createChatChannel(deps) {
         })
       } catch {
         // 成员目录只是辅助信息，失败不影响回复
+      }
+    }
+
+    // 入群人机验证：未验证成员的所有消息都先交给验证逻辑
+    if (scope === 'group' && typeof onVerifyCode === 'function') {
+      let verifyResult = null
+      try {
+        verifyResult = await onVerifyCode(data)
+      } catch (error) {
+        logger.warn(`qq-free channel: 入群验证失败 ${error instanceof Error ? error.message : String(error)}`)
+      }
+      if (verifyResult !== null && verifyResult.handled === true) {
+        if (typeof verifyResult.reply === 'string' && verifyResult.reply.length > 0) {
+          await sendReply('group', openid, id, verifyResult.reply)
+        }
+        return
       }
     }
 
