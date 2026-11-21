@@ -121,11 +121,12 @@ export function createTunnel({ dataDir, getConfig, logger }) {
       try { writeFileSync(lockFile(), String(child.pid), 'utf8') } catch { /* ignore */ }
     }
     child.on('exit', (code) => {
+      const exitedPid = child?.pid
       child = null
       stopPolling()
       try {
         const pid = Number.parseInt(readFileSync(lockFile(), 'utf8').trim(), 10)
-        if (!Number.isFinite(pid) || pid === child?.pid) unlinkSync(lockFile())
+        if (!Number.isFinite(pid) || pid === exitedPid) unlinkSync(lockFile())
       } catch {
         // ignore
       }
@@ -156,6 +157,7 @@ export function createTunnel({ dataDir, getConfig, logger }) {
       try { child.kill() } catch { /* ignore */ }
       child = null
     }
+    try { unlinkSync(lockFile()) } catch { /* ignore */ }
     stopping = false
   }
 
