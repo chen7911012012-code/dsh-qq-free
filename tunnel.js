@@ -117,9 +117,18 @@ export function createTunnel({ dataDir, getConfig, logger }) {
       lastError = error instanceof Error ? error.message : String(error)
       logger.warn(`qq-free tunnel: ${lastError}`)
     })
+    if (child.pid) {
+      try { writeFileSync(lockFile(), String(child.pid), 'utf8') } catch { /* ignore */ }
+    }
     child.on('exit', (code) => {
       child = null
       stopPolling()
+      try {
+        const pid = Number.parseInt(readFileSync(lockFile(), 'utf8').trim(), 10)
+        if (!Number.isFinite(pid) || pid === child?.pid) unlinkSync(lockFile())
+      } catch {
+        // ignore
+      }
       if (!stopping && getConfig().tunnelEnabled === true) {
         lastError = `cloudflared 退出（code ${code ?? '?'}），8 秒后重启`
         scheduleRestart()
