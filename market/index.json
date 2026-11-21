@@ -1,0 +1,93 @@
+{
+  "format": 1,
+  "title": {
+    "en": "QQ free talk plugin index",
+    "zh": "QQ 自动发言插件源"
+  },
+  "description": {
+    "en": "A DSH plugin index with the QQ free-talk bundle by 都有文明每天.",
+    "zh": "只收录都有文明每天开发的 QQ 自动发言插件的 DSH 插件索引。"
+  },
+  "metadata": {
+    "categories": {
+      "im": {
+        "title": {
+          "en": "Messaging",
+          "zh": "消息与聊天"
+        }
+      }
+    },
+    "labels": {
+      "qq": {
+        "title": {
+          "en": "QQ",
+          "zh": "QQ"
+        }
+      },
+      "deepseek": {
+        "title": {
+          "en": "DeepSeek",
+          "zh": "DeepSeek"
+        }
+      }
+    },
+    "sortKeys": {
+      "published": {
+        "title": {
+          "en": "Published",
+          "zh": "发布时间"
+        },
+        "order": "desc"
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-qq-free",
+      "title": {
+        "en": "QQ free talk",
+        "zh": "QQ 自动发言"
+      },
+      "description": {
+        "en": "Let an official QQ bot speak without being mentioned, with DeepSeek chat, moderation, group management and a remote console.",
+        "zh": "让 QQ 官方机器人不用被 @ 也能主动开口：DeepSeek 对话、违禁词、群管理、远程控制台。"
+      },
+      "icon": "https://raw.githubusercontent.com/chen7911012012-code/dsh-qq-free/main/icon.svg",
+      "author": "都有文明每天",
+      "homepage": "https://github.com/chen7911012012-code/dsh-qq-free",
+      "repository": {
+        "url": "https://github.com/chen7911012012-code/dsh-qq-free"
+      },
+      "metadata": {
+        "category": "im",
+        "keywords": [
+          "qq",
+          "qqbot",
+          "deepseek",
+          "dsh",
+          "dsh-plugin",
+          "chat"
+        ],
+        "labels": [
+          "qq",
+          "deepseek"
+        ],
+        "sortKeys": {
+          "published": 1795229000
+        }
+      },
+      "versions": [
+        {
+          "version": "1.14.0",
+          "publishTimestamp": 1795229000,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/chen7911012012-code/dsh-qq-free",
+            "commit": "983369da098b5bfaeb3ca7c5c98449e6da2e2bbf"
+          },
+          "engines": {}
+        }
+      ]
+    }
+  ]
+}
