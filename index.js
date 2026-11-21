@@ -102,6 +102,7 @@ const DEFAULT_CONFIG = {
   githubToken: '',
   githubAuto: true,
   creatorMode: false,
+  ownerOpenid: '',
   tunnelEnabled: false,
   tunnelBin: '',
 }
@@ -311,6 +312,9 @@ export async function apply(ctx, config) {
   state.memberJoins = state.memberJoins !== null && typeof state.memberJoins === 'object' ? state.memberJoins : {}
   state.announcements = Array.isArray(state.announcements)
     ? state.announcements.filter((item) => item && typeof item.id === 'string' && typeof item.text === 'string').slice(-100)
+    : []
+  state.groupManagers = Array.isArray(state.groupManagers)
+    ? state.groupManagers.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.memberOpenid === 'string').slice(-500)
     : []
 
   // 只保留今天的配额计数
@@ -2282,6 +2286,8 @@ export async function apply(ctx, config) {
       blockedMentions: state.blockedMentions.slice(-100),
       groupBlocks: state.groupBlocks.slice(-200),
       announcements: state.announcements.slice(-50),
+      groupManagers: state.groupManagers.slice(-200),
+      ownerOpenid: liveConfig.ownerOpenid || '',
       boards: state.boards.map((board) => ({
         id: board.id,
         name: board.name,
