@@ -600,12 +600,13 @@ if (ws) {
   const beforeWrong = sent.length
   ws.emit({ op: 0, s: 32, t: 'GROUP_MEMBER_ADD', d: { group_openid: GROUP, member_openid: 'VERIFY02', username: '新人二', member_role: 'member', timestamp: new Date().toISOString() } })
   await sleep(200)
-  const verifyMessage2 = sent.slice(beforeWrong).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.markdown?.content?.includes('验证码'))
-  const verifyCode2 = /验证码：(\d{6})/.exec(verifyMessage2?.body?.markdown?.content ?? '')?.[1] ?? ''
+  const verifyCode2 = readVerifyCode('VERIFY02')
   const wrongCode = verifyCode2 === '000000' ? '111111' : '000000'
   ws.emit({ op: 0, s: 33, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-VERIFY-BAD', content: `<@BOT> ${wrongCode}`, group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'VERIFY02', member_role: 'member' } } })
   await sleep(200)
-  check('验证码错误踢人', sent.slice(beforeWrong).some((item) => item.target.includes('/batch_remove_members') && JSON.stringify(item.body).includes('VERIFY02')))
+  const wrongReplyIndex = sent.findIndex((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-VERIFY-BAD')
+  const wrongKickIndex = sent.findIndex((item) => item.target.includes('/batch_remove_members') && JSON.stringify(item.body).includes('VERIFY02'))
+  check('验证码错误先回复再踢人', wrongReplyIndex >= 0 && wrongKickIndex > wrongReplyIndex && sent[wrongReplyIndex]?.body?.content?.includes('验证码错误，已将 新人二 移出群聊'))
   await call('/qq-free/config', 'POST', { joinVerifyEnabled: false, joinVerifyGroups: [] })
 }
 
