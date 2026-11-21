@@ -2063,6 +2063,8 @@ export async function apply(ctx, config) {
       : null
     return {
       ok: true,
+      version: PACKAGE_VERSION,
+      creator: liveConfig.creatorMode === true,
       credential: {
         configured: Boolean(cfg.appId && cfg.appSecret),
         appId: cfg.appId || '',
