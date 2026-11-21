@@ -379,7 +379,7 @@ if (ws) {
   check('申请头像已上传', Boolean(avatarUpload) && avatarUpload.body.url === 'https://example.com/avatar.png' && avatarUpload.body.srv_send_msg === true, JSON.stringify(avatarUpload?.body))
   check('入群申请通知已发到对应群', Boolean(joinNotice) && joinNotice.body.content.includes('申请人'), JSON.stringify(joinNotice?.body))
   check('通知含申请时间与验证答案', Boolean(joinNotice) && joinNotice.body.content.includes('申请时间') && joinNotice.body.content.includes('回答：想交流'), JSON.stringify(joinNotice?.body))
-  check('通知显示成员与群 openid', Boolean(joinNotice) && joinNotice.body.content.includes('成员 openid：') && joinNotice.body.content.includes('群 openid：'), JSON.stringify(joinNotice?.body))
+  check('通知只显示成员 openid，不显示群 openid', Boolean(joinNotice) && joinNotice.body.content.includes('成员 openid：') && !joinNotice.body.content.includes('群 openid：'), JSON.stringify(joinNotice?.body))
   check('通知不再出现 <@...> 或申请号', Boolean(joinNotice) && !joinNotice.body.content.includes('<@') && !joinNotice.body.content.includes('申请号'), JSON.stringify(joinNotice?.body))
   check('入群申请已记录', (await call('/qq-free/state')).body.pendingJoins.length === 1)
 
