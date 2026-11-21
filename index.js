@@ -1101,10 +1101,8 @@ export async function apply(ctx, config) {
     const memberOpenid = String(data.member_openid ?? '')
     if (groupOpenid.length > 0 && memberOpenid.length > 0) {
       state.memberJoins[`${groupOpenid}:${memberOpenid}`] = String(data.timestamp ?? new Date().toISOString())
-      const before = state.pendingJoins.length
       state.pendingJoins = state.pendingJoins.filter((item) => !(item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid))
       persistState()
-      if (state.pendingJoins.length !== before) void 0
     } else {
       persistState()
     }
