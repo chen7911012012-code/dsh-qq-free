@@ -1339,7 +1339,7 @@ window.__ModuleLoader__.load({
                       h('div', { className: 'qqf-mono' },
                         `成员 openid：${entry.member_openid}`),
                       h('div', { className: 'qqf-mono' },
-                        `群 openid：${entry.group_openid}${entry.apply_at ? ` · ${entry.apply_at}` : ''}${entry.risk_tips ? ` · ${entry.risk_tips}` : ''}`)),
+                        `${entry.apply_at ? `申请时间：${entry.apply_at}` : ''}${entry.risk_tips ? ` · ${entry.risk_tips}` : ''}`)),
                     h('div', { className: 'qqf-row' },
                       h('button', {
                         className: 'qqf-btn qqf-btn--sm', disabled: busy !== '',
