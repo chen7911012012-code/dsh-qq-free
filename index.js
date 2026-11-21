@@ -2216,6 +2216,23 @@ export async function apply(ctx, config) {
 
     disposers.push(webServer.register({
       kind: 'exact',
+      path: '/qq-free/update',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const action = String(body.action ?? 'check')
+        if (action === 'download') {
+          const result = await downloadUpdate()
+          sendJson(res, 200, { ok: true, result })
+          return
+        }
+        const result = await checkUpdate()
+        sendJson(res, 200, { ok: true, result })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
       path: '/qq-free/state',
       handler: route((req, res) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') {
