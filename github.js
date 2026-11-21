@@ -13,12 +13,12 @@ import { join } from 'node:path'
 
 const ROOT_FILES = [
   'index.js', 'channel.js', 'remote.js', 'remote-page.js', 'client.js', 'cloud.js', 'github.js',
-  'package.json', 'cordis.patch.yml', 'icon.svg', 'README.md', 'LICENSE', 'NOTICE.md', 'AUTHORS.md',
+  'package.json', 'cordis.patch.yml', 'icon.svg', 'README.md', 'LICENSE', 'NOTICE.md', 'AUTHORS.md', 'CHANGELOG.md',
   'index.html', '.gitignore',
 ]
 const ROOT_DIRS = ['docs', 'locale', 'tools', 'test', 'market', '.github']
 const IGNORE = new Set(['node_modules', '.git', 'publish', '.DS_Store'])
-const ALLOWED = /^(index\.js|channel\.js|remote\.js|remote-page\.js|client\.js|cloud\.js|github\.js|package\.json|cordis\.patch\.yml|icon\.svg|README\.md|LICENSE|NOTICE\.md|AUTHORS\.md|index\.html|\.gitignore|docs\/|locale\/|tools\/|test\/|market\/|\.github\/)/
+const ALLOWED = /^(index\.js|channel\.js|remote\.js|remote-page\.js|client\.js|cloud\.js|github\.js|package\.json|cordis\.patch\.yml|icon\.svg|README\.md|LICENSE|NOTICE\.md|AUTHORS\.md|CHANGELOG\.md|index\.html|\.gitignore|docs\/|locale\/|tools\/|test\/|market\/|\.github\/)/
 
 function collect(pluginDir) {
   const files = []
