@@ -1134,24 +1134,103 @@ export async function apply(ctx, config) {
     await sendWelcome(data)
   }
 
+  function isOwnerMember(memberOpenid) {
+    const owner = String(liveConfig.ownerOpenid || '').trim()
+    return owner.length > 0 && owner === String(memberOpenid ?? '')
+  }
+
+  function isGroupDelegate(groupOpenid, memberOpenid) {
+    return state.groupManagers.some((item) => item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid)
+  }
+
+  function isGroupManager(groupOpenid, memberOpenid, role) {
+    return role === 'admin' || role === 'owner' || isOwnerMember(memberOpenid) || isGroupDelegate(groupOpenid, memberOpenid)
+  }
+
+  function canConfigureManagers(memberOpenid, role) {
+    return role === 'admin' || role === 'owner' || isOwnerMember(memberOpenid)
+  }
+
+  async function groupInfoReply(groupOpenid) {
+    const saved = findTarget(groupOpenid)
+    let info = null
+    try {
+      info = await groupApi('GET', `/v2/groups/${encodeURIComponent(groupOpenid)}/info`)
+    } catch {
+      // 群信息接口可能需要内邀权限，退回本地信息
+    }
+    const name = String(info?.group_name ?? info?.name ?? saved?.name ?? '').trim() || '未知'
+    const lines = [
+      '📋 群聊信息',
+      `群名：${name}`,
+      `群 openid：${groupOpenid}`,
+    ]
+    if (info?.member_count !== undefined) lines.push(`成员数：${info.member_count}`)
+    if (info?.group_founder_openid) lines.push(`群主 openid：${info.group_founder_openid}`)
+    return lines.join('\n')
+  }
+
   async function handleGroupCommand(data) {
     const role = String(data.author?.member_role ?? '')
-    if (role !== 'admin' && role !== 'owner') return null
+    const memberOpenid = String(data.author?.member_openid ?? '')
+    const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
+    const manager = isGroupManager(groupOpenid, memberOpenid, role)
     const raw = String(data.content ?? '')
     const text = raw
       .replace(/<@!?[^>]+>/g, '')
       .replace(/\s+/g, ' ')
       .trim()
 
+    const mentions = Array.isArray(data.mentions) ? data.mentions : []
+    const targetMention = mentions.find((mention) => mention && mention.is_you !== true && mention.member_openid)
+    const targetOpenid = String(targetMention?.member_openid ?? '')
+    const targetName = String(targetMention?.username ?? targetMention?.member_nickname ?? '')
+
+    // 代管管理：只有主人、群主、群管理员可以添加/取消
+    if (/^(添加代管|取消代管)$/.test(text)) {
+      if (!canConfigureManagers(memberOpenid, role)) return '只有主人、群主或群管理员可以管理代管。'
+      if (targetOpenid.length === 0) return `请 @ 要${text}的成员。`
+      if (text === '添加代管') {
+        if (!isGroupDelegate(groupOpenid, targetOpenid)) {
+          state.groupManagers.push({
+            groupOpenid,
+            memberOpenid: targetOpenid,
+            name: targetName,
+            addedBy: memberOpenid,
+            addedAt: new Date().toISOString(),
+          })
+          persistState()
+        }
+        return `已添加 ${targetName || targetOpenid} 为代管。`
+      }
+      const before = state.groupManagers.length
+      state.groupManagers = state.groupManagers.filter((item) => !(item.groupOpenid === groupOpenid && item.memberOpenid === targetOpenid))
+      if (state.groupManagers.length === before) return `${targetName || targetOpenid} 不是代管。`
+      persistState()
+      return `已取消 ${targetName || targetOpenid} 的代管。`
+    }
+    if (text === '代管列表') {
+      if (!manager) return '只有群主、管理员或代管可以查看代管列表。'
+      const list = state.groupManagers.filter((item) => item.groupOpenid === groupOpenid)
+      return list.length === 0 ? '当前没有代管。' : `当前代管：\n${list.map((item) => `· ${item.name || item.memberOpenid}`).join('\n')}`
+    }
+    if (text === '群信息' || text === '获取群信息') {
+      if (!manager) return '只有群主、管理员或代管可以获取群信息。'
+      return groupInfoReply(groupOpenid)
+    }
+
+    if (!manager) {
+      if (/^(同意|通过|拒绝|不同意|禁言|解禁|解除禁言|踢人|踢出|移出)/.test(text)) {
+        return '只有群主、管理员或代管可以执行这个操作。'
+      }
+      return null
+    }
+
     // 群内 @ 成员做禁言 / 解禁 / 踢人（官方接口不提供 QQ 号到 openid 的映射）
     const modMatch = /^(禁言|解禁|解除禁言|踢人|踢出|移出)\s*(\d+)?$/u.exec(text)
     if (modMatch !== null) {
       const action = modMatch[1]
-      const mentions = Array.isArray(data.mentions) ? data.mentions : []
-      const targetMention = mentions.find((mention) => mention && mention.is_you !== true && mention.member_openid)
-      const targetOpenid = String(targetMention?.member_openid ?? '')
       if (targetOpenid.length === 0) return '请 @ 要操作的成员，例如「禁言 @某人 60」。'
-      const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
       const groupPath = `/v2/groups/${encodeURIComponent(groupOpenid)}`
       if (action === '踢人' || action === '踢出' || action === '移出') {
         await groupApi('POST', `${groupPath}/batch_remove_members`, { member_openids: [targetOpenid] })
