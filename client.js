@@ -1263,6 +1263,12 @@ window.__ModuleLoader__.load({
                   placeholder: '留空会在启用时自动生成',
                   onChange: (event) => setRemoteForm({ ...remoteForm, token: event.target.value }),
                 })),
+              h('label', { className: 'qqf-row' },
+                h('input', {
+                  type: 'checkbox', checked: remoteForm?.tunnelEnabled === true,
+                  onChange: (event) => setRemoteForm({ ...remoteForm, tunnelEnabled: event.target.checked }),
+                }),
+                h('span', null, '自动启动公网隧道（cloudflared，DSH 重启后自动恢复）')),
               h('div', { className: 'qqf-row' },
                 h('button', {
                   className: 'qqf-btn qqf-btn--primary', disabled: busy !== '',
