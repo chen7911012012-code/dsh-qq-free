@@ -7,7 +7,7 @@
  * @module @local/dsh-qq-free/tunnel
  */
 
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -31,6 +31,12 @@ export function createTunnel({ dataDir, getConfig, logger }) {
   }
 
   function killPrevious() {
+    // 插件自己管理 cloudflared：启动前清掉所有旧实例，避免 HMR/重启后残留多个隧道
+    try {
+      execFileSync('taskkill', ['/F', '/IM', 'cloudflared.exe'], { stdio: 'ignore', windowsHide: true })
+    } catch {
+      // 没有进程时会返回非 0
+    }
     try {
       const pid = Number.parseInt(readFileSync(lockFile(), 'utf8').trim(), 10)
       if (Number.isFinite(pid) && pid > 0) {
@@ -156,6 +162,11 @@ export function createTunnel({ dataDir, getConfig, logger }) {
     if (child !== null) {
       try { child.kill() } catch { /* ignore */ }
       child = null
+    }
+    try {
+      execFileSync('taskkill', ['/F', '/IM', 'cloudflared.exe'], { stdio: 'ignore', windowsHide: true })
+    } catch {
+      // ignore
     }
     try { unlinkSync(lockFile()) } catch { /* ignore */ }
     stopping = false
