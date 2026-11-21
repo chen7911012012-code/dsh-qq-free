@@ -254,6 +254,11 @@ window.__ModuleLoader__.load({
       const [gbFeatures, setGbFeatures] = useState([])
       const [annForm, setAnnForm] = useState({ name: '', groups: [], date: '', time: '09:00', text: '', enabled: true })
       const [annImage, setAnnImage] = useState(null)
+      const [ownerId, setOwnerId] = useState(null)
+      const [gmGroup, setGmGroup] = useState('')
+      const [gmMember, setGmMember] = useState('')
+      const [gmName, setGmName] = useState('')
+      const [groupInfo, setGroupInfo] = useState('')
       const [mentionMember, setMentionMember] = useState('')
       const [mentionName, setMentionName] = useState('')
       const [welcomeForm, setWelcomeForm] = useState(null)
@@ -339,8 +344,8 @@ window.__ModuleLoader__.load({
             auto: data.cloud.auto === true,
           })
         }
-        if (githubForm === null && data.github) {
-          setGithubForm({
+        if (ownerId === null) setOwnerId(data.ownerOpenid || '')
+        if (githubForm === null && data.github) {          setGithubForm({
             enabled: data.github.enabled === true,
             owner: data.github.owner || 'chen7911012012-code',
             repo: data.github.repo || 'dsh-qq-free',
@@ -775,6 +780,41 @@ window.__ModuleLoader__.load({
           const failed = (result.results ?? []).filter((item) => item.ok !== true)
           flash(failed.length > 0 ? 'error' : 'ok', failed.length > 0 ? failed[0].error : '已立即发送。')
         }
+      }
+
+      async function saveOwner() {
+        const result = await run('owner', () => request('/qq-free/owner', { ownerOpenid: (ownerId ?? '').trim() }))
+        if (result !== null) flash('ok', '主人已保存。')
+      }
+
+      async function addGroupManager() {
+        if (gmGroup === '' || gmMember.trim() === '') return
+        const result = await run('group-manager', () => request('/qq-free/group-managers', {
+          action: 'save',
+          groupOpenid: gmGroup,
+          memberOpenid: gmMember.trim(),
+          name: gmName.trim(),
+        }))
+        if (result !== null) {
+          setGmMember('')
+          setGmName('')
+          flash('ok', '已添加代管。')
+        }
+      }
+
+      async function removeGroupManager(entry) {
+        const result = await run(`group-manager-${entry.memberOpenid}`, () => request('/qq-free/group-managers', {
+          action: 'remove',
+          groupOpenid: entry.groupOpenid,
+          memberOpenid: entry.memberOpenid,
+        }))
+        if (result !== null) flash('ok', '已取消代管。')
+      }
+
+      async function fetchGroupInfo(groupOpenid) {
+        if (groupOpenid === '') return
+        const result = await run('group-info', () => request('/qq-free/group-info', { groupOpenid }))
+        if (result !== null) setGroupInfo(result.text || '')
       }
 
       async function cloudAction(action) {
@@ -1821,6 +1861,55 @@ window.__ModuleLoader__.load({
                       onClick: () => void removeMentionBlock(entry),
                     }, '取消'))))
                 : h('p', { className: 'qqf-empty' }, '还没有 @ 屏蔽。')),
+
+            h(Card, {
+              title: '主人与代管',
+              wide: true,
+              hint: '主人拥有全部权限；群主、群管理员默认有管理权限；代管可执行审批、禁言、踢人、群信息等操作。',
+            },
+              h('div', { className: 'qqf-row' },
+                h('input', {
+                  className: 'qqf-input qqf-grow', value: ownerId ?? '', placeholder: '主人 member_openid',
+                  onChange: (event) => setOwnerId(event.target.value),
+                }),
+                h('button', { className: 'qqf-btn', disabled: busy !== '', onClick: () => void saveOwner() }, '保存主人')),
+              h('div', { className: 'qqf-split' }),
+              h('div', { className: 'qqf-row' },
+                h('select', {
+                  className: 'qqf-select qqf-grow', value: gmGroup,
+                  onChange: (event) => setGmGroup(event.target.value),
+                },
+                  h('option', { value: '' }, '选择群聊…'),
+                  groupTargets.map((target) => h('option', { key: target.id, value: target.openid }, target.name))),
+                h('input', {
+                  className: 'qqf-input qqf-grow', value: gmMember, placeholder: '代管 member_openid',
+                  onChange: (event) => setGmMember(event.target.value),
+                }),
+                h('input', {
+                  className: 'qqf-input', value: gmName, placeholder: '备注',
+                  onChange: (event) => setGmName(event.target.value),
+                }),
+                h('button', {
+                  className: 'qqf-btn', disabled: busy !== '' || gmGroup === '' || gmMember.trim() === '',
+                  onClick: () => void addGroupManager(),
+                }, '添加代管')),
+              h('div', { className: 'qqf-row' },
+                h('button', {
+                  className: 'qqf-btn qqf-btn--ghost', disabled: busy !== '' || gmGroup === '',
+                  onClick: () => void fetchGroupInfo(gmGroup),
+                }, '获取群信息')),
+              groupInfo ? h('pre', { className: 'qqf-mono', style: { whiteSpace: 'pre-wrap' } }, groupInfo) : null,
+              data.groupManagers && data.groupManagers.length > 0
+                ? h('ul', { className: 'qqf-targets' },
+                  data.groupManagers.map((entry) => h('li', { key: `${entry.groupOpenid}-${entry.memberOpenid}`, className: 'qqf-target' },
+                    h('div', { className: 'qqf-target-main' },
+                      h('span', { className: 'qqf-target-name' }, entry.name || entry.memberOpenid),
+                      h('span', { className: 'qqf-mono' }, `${entry.groupOpenid} · ${entry.memberOpenid}`)),
+                    h('button', {
+                      className: 'qqf-btn qqf-btn--sm qqf-btn--danger', disabled: busy !== '',
+                      onClick: () => void removeGroupManager(entry),
+                    }, '取消'))))
+                : h('p', { className: 'qqf-empty' }, '还没有代管。')),
 
             h(Card, {
               title: '群功能屏蔽',
