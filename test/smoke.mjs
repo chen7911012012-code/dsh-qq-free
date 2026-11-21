@@ -329,8 +329,8 @@ if (ws) {
   const groupReply = sent.slice(beforeGroup).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-2')
   check('群 @ 自动回复', Boolean(groupReply))
   check('群回复用 Markdown @ 提问人', groupReply?.body?.msg_type === 2 && groupReply.body.markdown.content.includes('<qqbot-at-user id="ASKER1"/>'), JSON.stringify(groupReply?.body))
-  check('回答强制走 DeepSeek 而非问答库', Boolean(groupReply) && groupReply.body.markdown.content.includes('摸鱼') && !groupReply.body.markdown.content.includes('库答案'), JSON.stringify(groupReply?.body))
-  check('提问被识别并走 DeepSeek', (await call('/qq-free/state')).body.chatLog.some((entry) => entry.question === '你好' && entry.source === 'deepseek'))
+  check('问答库命中时优先使用库答案', Boolean(groupReply) && groupReply.body.markdown.content.includes('库答案') && !groupReply.body.markdown.content.includes('摸鱼'), JSON.stringify(groupReply?.body))
+  check('问答库命中记录 source=library', (await call('/qq-free/state')).body.chatLog.some((entry) => entry.question === '你好' && entry.source === 'library'))
 
   ws.emit({ op: 0, s: 6, t: 'GROUP_ADD_ROBOT', d: { group_openid: 'NEWGROUPOPENID99999', group_name: '新群' } })
   await sleep(120)
