@@ -2773,7 +2773,7 @@ export async function apply(ctx, config) {
         if (next.tunnelEnabled && next.webEnabled) {
           setTimeout(() => tunnel.start(), 1200).unref?.()
         } else {
-          tunnel.stop()
+          tunnel.stop(true)
         }
         sendJson(res, 200, { ok: true, state: snapshot() })
       }),
