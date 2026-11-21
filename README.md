@@ -75,6 +75,10 @@ npx @deepseek-ai/dsh plugin --profile <profile> add C:\path\to\dsh-qq-free
 
 数据目录默认为 `~/.dsh/qq-free/`（有 `DSH_PROFILE_DIR` 时用 profile 下的 `.qq-free/`）。详细说明见 `docs/DETAIL.md`。
 
+## 更新日志
+
+见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## License
 
-MIT
+MIT（附署名要求），见 [LICENSE](LICENSE) 与 [NOTICE.md](NOTICE.md)。
