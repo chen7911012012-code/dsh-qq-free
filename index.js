@@ -41,6 +41,13 @@ function resolveDataDir() {
 
 const DATA_DIR = resolveDataDir()
 const PLUGIN_DIR = dirname(fileURLToPath(import.meta.url))
+const PACKAGE_VERSION = (() => {
+  try {
+    return String(JSON.parse(readFileSync(join(PLUGIN_DIR, 'package.json'), 'utf8')).version || '')
+  } catch {
+    return ''
+  }
+})()
 const CONFIG_FILE = join(DATA_DIR, 'config.json')
 const STATE_FILE = join(DATA_DIR, 'state.json')
 const QA_FILE = join(DATA_DIR, 'qa.json')
@@ -93,6 +100,7 @@ const DEFAULT_CONFIG = {
   githubRepo: 'dsh-qq-free',
   githubToken: '',
   githubAuto: true,
+  creatorMode: false,
 }
 
 const EDITABLE_KEYS = new Set(Object.keys(DEFAULT_CONFIG))
@@ -167,6 +175,8 @@ function pickConfig(input) {
     } else if (key === 'cloudEnabled' || key === 'cloudAuto') {
       out[key] = value === true || value === 'true'
     } else if (key === 'githubEnabled' || key === 'githubAuto') {
+      out[key] = value === true || value === 'true'
+    } else if (key === 'creatorMode') {
       out[key] = value === true || value === 'true'
     } else {
       out[key] = String(value).slice(0, key === 'appSecret' ? 256 : 4000)
