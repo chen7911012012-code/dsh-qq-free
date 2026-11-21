@@ -1345,8 +1345,11 @@ export async function apply(ctx, config) {
       return null
     }
 
-    // 群内 @ 成员做禁言 / 解禁 / 踢人（官方接口不提供 QQ 号到 openid 的映射）
-    const modMatch = /^(禁言|解禁|解除禁言|踢人|踢出|移出)\s*(\d+)?$/u.exec(text)
+    // 群内 @ 成员做禁言 / 解禁 / 踢人（支持「禁@x」「解@x」「飞@x」和「禁言 @x 60」）
+    const alias = /^(禁|解|飞)$/u.exec(text)
+    const modMatch = alias !== null
+      ? [text, alias[1] === '禁' ? '禁言' : alias[1] === '解' ? '解禁' : '踢人', '']
+      : /^(禁言|解禁|解除禁言|踢人|踢出|移出)\s*(\d+)?$/u.exec(text)
     if (modMatch !== null) {
       const action = modMatch[1]
       if (targetOpenid.length === 0) return '请 @ 要操作的成员，例如「禁言 @某人 60」。'
@@ -2500,6 +2503,10 @@ export async function apply(ctx, config) {
       announcements: state.announcements.slice(-50),
       groupManagers: state.groupManagers.slice(-200),
       joinVerifications: state.joinVerifications.map((item) => ({ groupOpenid: item.groupOpenid, memberOpenid: item.memberOpenid, name: item.name, expiresAt: item.expiresAt })),
+      joinVerify: {
+        enabled: liveConfig.joinVerifyEnabled === true,
+        groups: Array.isArray(liveConfig.joinVerifyGroups) ? liveConfig.joinVerifyGroups : [],
+      },
       ownerOpenid: liveConfig.ownerOpenid || '',
       boards: state.boards.map((board) => ({
         id: board.id,
