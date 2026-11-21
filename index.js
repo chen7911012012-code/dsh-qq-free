@@ -372,6 +372,53 @@ export async function apply(ctx, config) {
     })
   }
 
+  async function fillGroupName(groupOpenid, target) {
+    try {
+      const info = await groupApi('GET', `/v2/groups/${encodeURIComponent(groupOpenid)}/info`)
+      const name = String(info?.group_name ?? info?.name ?? '').trim()
+      if (name.length > 0) {
+        const current = state.targets.find((item) => item.id === target.id)
+        if (current) {
+          current.name = name.slice(0, 60)
+          current.nameResolved = true
+          persistState()
+          logger.info(`qq-free: 新群名称 ${name}`)
+        }
+      }
+    } catch {
+      // 没有群信息权限时保留占位名
+    }
+  }
+
+  /** 收到新群事件时自动把群加进会话目标，面板下一次轮询就能看到。 */
+  function rememberGroupTarget({ groupOpenid, groupName }) {
+    const openid = String(groupOpenid ?? '').trim()
+    if (!/^[A-Za-z0-9_-]{8,}$/.test(openid)) return
+    const existing = state.targets.find((target) => target.scope === 'group' && target.openid === openid)
+    if (existing) {
+      if (groupName && (!existing.name || existing.name.startsWith('QQ 群 '))) {
+        existing.name = String(groupName).slice(0, 60)
+        existing.nameResolved = true
+        persistState()
+      }
+      return
+    }
+    const target = {
+      id: `group-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      scope: 'group',
+      openid,
+      name: String(groupName || '').trim().slice(0, 60) || `QQ 群 ${openid.slice(-6)}`,
+      nameResolved: Boolean(groupName),
+      auto: true,
+      addedAt: new Date().toISOString(),
+    }
+    state.targets.push(target)
+    persistState()
+    logger.info(`qq-free: 自动发现新群 ${openid}`)
+    if (!liveConfig.defaultTarget) saveConfigPatch({ defaultTarget: target.id })
+    if (!target.nameResolved) void fillGroupName(openid, target)
+  }
+
   // ── 问答库 ───────────────────────────────────────────────────────────────
 
   let qa = readJson(QA_FILE, [])
