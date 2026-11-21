@@ -510,8 +510,8 @@ export function createChatChannel(deps) {
       answer = '在的，直接问我问题就行。'
       source = 'prompt'
     } else {
-      // 所有问题强制走 DeepSeek；问答库只供工具/智能体使用
-      const match = null
+      // 命中问答库就直接用库里的答案；未命中走 DeepSeek
+      const match = cfg.chatUseQa === false ? null : searchQa(question)
       if (match !== null) {
         answer = String(match.entry.answer ?? '').trim()
         source = 'library'
