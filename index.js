@@ -1830,6 +1830,81 @@ export async function apply(ctx, config) {
     return () => cloud.stop()
   }, 'qq-free.cloud')
 
+  const UPDATE_REPO = 'chen7911012012-code/dsh-qq-free'
+
+  function versionParts(value) {
+    return String(value ?? '').replace(/^v/i, '').split(/[.+-]/).map((part) => Number.parseInt(part, 10) || 0)
+  }
+
+  function isNewerVersion(current, latest) {
+    const left = versionParts(current)
+    const right = versionParts(latest)
+    const length = Math.max(left.length, right.length)
+    for (let index = 0; index < length; index += 1) {
+      const a = left[index] ?? 0
+      const b = right[index] ?? 0
+      if (b > a) return true
+      if (b < a) return false
+    }
+    return false
+  }
+
+  async function checkUpdate() {
+    let response
+    try {
+      response = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
+        headers: { accept: 'application/vnd.github+json', 'user-agent': 'dsh-qq-free-update-check' },
+        signal: AbortSignal.timeout(25_000),
+      })
+    } catch (error) {
+      throw new Error(`连接 GitHub 失败：${error instanceof Error ? error.message : String(error)}`)
+    }
+    if (!response.ok) throw new Error(`GitHub 返回 HTTP ${response.status}`)
+    const release = await response.json()
+    const latest = String(release.tag_name || release.name || '').replace(/^v/i, '')
+    if (latest.length === 0) throw new Error('GitHub Release 没有版本号')
+    const assets = Array.isArray(release.assets)
+      ? release.assets.map((asset) => ({ name: asset.name, url: asset.browser_download_url, size: asset.size }))
+      : []
+    return {
+      current: PACKAGE_VERSION,
+      latest,
+      hasUpdate: isNewerVersion(PACKAGE_VERSION, latest),
+      name: String(release.name ?? `v${latest}`),
+      notes: String(release.body ?? '').slice(0, 2000),
+      url: String(release.html_url ?? ''),
+      assets,
+    }
+  }
+
+  async function downloadUpdate() {
+    const info = await checkUpdate()
+    const asset = info.assets.find((item) => item.name === 'dsh-qq-free.tgz')
+      ?? info.assets.find((item) => item.name.endsWith('.tgz'))
+    if (!asset) throw new Error('这个 Release 没有 tgz 包')
+    let response
+    try {
+      response = await fetch(asset.url, {
+        headers: { 'user-agent': 'dsh-qq-free-update-download' },
+        signal: AbortSignal.timeout(120_000),
+      })
+    } catch (error) {
+      throw new Error(`下载失败：${error instanceof Error ? error.message : String(error)}`)
+    }
+    if (!response.ok) throw new Error(`下载失败：HTTP ${response.status}`)
+    const buffer = Buffer.from(await response.arrayBuffer())
+    const dir = join(DATA_DIR, 'updates')
+    mkdirSync(dir, { recursive: true })
+    const file = join(dir, `dsh-qq-free-${info.latest}.tgz`)
+    writeFileSync(file, buffer)
+    return {
+      ...info,
+      file,
+      bytes: buffer.length,
+      installHint: `dsh plugin --profile <profile> add "${file}"`,
+    }
+  }
+
   // ── 目标（会话）管理 ─────────────────────────────────────────────────────
 
   function findTarget(idOrKey) {
