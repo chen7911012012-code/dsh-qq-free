@@ -1,0 +1,91 @@
+{
+  "format": 1,
+  "title": {
+    "en": "QQ free talk plugin index",
+    "zh": "QQ 自动发言插件源"
+  },
+  "description": {
+    "en": "A DSH plugin index with the QQ free-talk bundle.",
+    "zh": "只收录 QQ 自动发言插件的 DSH 插件索引。"
+  },
+  "metadata": {
+    "categories": {
+      "im": {
+        "title": {
+          "en": "Messaging",
+          "zh": "消息与聊天"
+        }
+      }
+    },
+    "labels": {
+      "qq": {
+        "title": {
+          "en": "QQ",
+          "zh": "QQ"
+        }
+      },
+      "deepseek": {
+        "title": {
+          "en": "DeepSeek",
+          "zh": "DeepSeek"
+        }
+      }
+    },
+    "sortKeys": {
+      "published": {
+        "title": {
+          "en": "Published",
+          "zh": "发布时间"
+        },
+        "order": "desc"
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-qq-free",
+      "title": {
+        "en": "QQ free talk",
+        "zh": "QQ 自动发言"
+      },
+      "description": {
+        "en": "Let an official QQ bot speak without being mentioned: proactive messages, DeepSeek-written lines, scheduled auto talk, and a web console.",
+        "zh": "让 QQ 官方机器人不用被 @ 也能主动开口：主动消息、DeepSeek 现写、定时自动发言，附网页控制台。"
+      },
+      "icon": "https://cdn.jsdelivr.net/npm/dsh-qq-free@1.14.0/icon.svg",
+      "author": "都有文明每天",
+      "homepage": "https://github.com/chen7911012012/dsh-qq-free",
+      "repository": {
+        "url": "https://github.com/chen7911012012/dsh-qq-free"
+      },
+      "metadata": {
+        "category": "im",
+        "keywords": [
+          "qq",
+          "qqbot",
+          "deepseek",
+          "dsh",
+          "dsh-plugin",
+          "chat"
+        ],
+        "labels": [
+          "qq",
+          "deepseek"
+        ],
+        "sortKeys": {
+          "published": 1795229972
+        }
+      },
+      "versions": [
+        {
+          "version": "1.14.0",
+          "publishTimestamp": 1795229972,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {}
+        }
+      ]
+    }
+  ]
+}

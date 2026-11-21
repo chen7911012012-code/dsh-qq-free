@@ -1,0 +1,44 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build package and market index
+        run: node tools/build-publish.mjs
+      - name: Build Chinese install docs (txt/html)
+        run: node tools/make-install-docs.mjs
+      - name: Build zips
+        run: |
+          cd publish
+          cp dsh-qq-free-*.tgz dsh-qq-free.tgz
+          zip -r "dsh-qq-free-${GITHUB_REF_NAME#v}.zip" dsh-qq-free
+          mkdir -p portable
+          cp -r dsh-qq-free portable/
+          cp INSTALL.md INSTALL.txt INSTALL.pdf portable/ 2>/dev/null || true
+          cd portable
+          zip -r "../dsh-qq-free-${GITHUB_REF_NAME#v}-portable.zip" .
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            publish/*.tgz
+            publish/*.zip
+            publish/INSTALL.md
+            publish/INSTALL.txt
+            publish/INSTALL.pdf
+          fail_on_unmatched_files: false
+          generate_release_notes: true

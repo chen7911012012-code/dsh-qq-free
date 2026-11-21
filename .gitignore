@@ -1,0 +1,10 @@
+node_modules/
+*.tmp
+*.log
+page-script.tmp.js
+publish/dsh-qq-free/
+publish/*.tgz
+publish/*.zip
+publish/SHA256SUMS.txt
+publish/INSTALL.html
+.env

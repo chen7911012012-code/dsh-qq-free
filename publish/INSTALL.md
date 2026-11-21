@@ -1,0 +1,74 @@
+# dsh-qq-free 安装说明（简体中文）
+
+这是一个自包含的 DSH bundle：不依赖 npm 上的其它插件包，装到任意 DSH profile 后即可在 Web 界面里使用。
+
+## 一、前提
+
+- DSH 0.2.x（本包在 0.2.2-rc.5 / Node 24 上验证）
+- 需要 Web 界面才能看到控制面板（左侧栏「QQ 自由发言」）；纯 CLI / headless profile 只有 host 能力，没有面板
+- 自带 QQ AI 对话通道要求运行时提供 WebSocket（Node 22+ 或 Electron；Desktop 自带运行时满足）
+- 能访问 QQ 开放平台，并且 profile 里已配置 DeepSeek 模型路由
+
+## 二、安装（二选一）
+
+### 方式 A：单文件 tgz（推荐分发）
+
+```powershell
+dsh plugin --profile <profile> add D:\path\to\dsh-qq-free-1.14.0.tgz
+```
+
+### 方式 B：解压目录
+
+1. 解压 `dsh-qq-free-1.14.0-portable.zip`，得到 `dsh-qq-free` 目录
+2. DSH →「插件」→「添加插件」→ 选择该目录，或：
+
+```powershell
+dsh plugin --profile <profile> add D:\path\to\dsh-qq-free
+```
+
+装好后：
+
+- 插件列表出现 `dsh-qq-free` bundle 和 `qq-free` 行
+- Web 左侧栏出现「QQ 自由发言」，设置页也有同名栏目
+
+## 三、首次配置
+
+1. **连接与模型**：填 QQ 开放平台机器人的 AppID / AppSecret（或设置环境变量 `QQBOT_APPID`、`QQBOT_SECRET`），选择 DeepSeek 模型
+2. **会话目标**：导入官方 QQ 插件已记录的会话，或手动粘贴 `group_openid` / `user_openid`
+3. **QQ AI 对话**：要用自带通道，先在「插件」里停用官方 QQ 机器人插件（同一个 AppID 不能有两个消息接收方），再点「启用通道」并确认
+4. **违禁词 / 屏蔽成员 / 群板块**：按需在面板里配置
+
+## 四、常用功能
+
+- 自由发言：文字、@ 群成员、本地图片/表情包/视频/语音/文件（≤5MB）
+- 群板块：把 1–3 个群组成板块，发送/生成/媒体/自动发言一次发到多个群
+- 群 AI：先判断提问/闲聊；提问走 DeepSeek 准确回答，闲聊用智能体人设接话
+- 违禁词：第 1 次撤回+警告，第 2 次撤回+禁言，第 3 次撤回+踢出
+- 屏蔽成员：忽略某人的消息，或忽略「@ 了某人」的整条消息
+- 入群申请：显示成员 openid、群 openid、申请时间、验证答案；未同意的申请不会自动删除
+- 云端同步：WebDAV 自动上传源码，另一台电脑同账号恢复
+
+## 五、远程发言网页
+
+面板「远程发言网页」可启动独立 HTTP 服务（默认 8788），手机/外网浏览器用 token 登录后可发送、自动发言、问答、入群审批、违禁词、目标与板块设置。
+
+公网使用建议套 Tailscale / Cloudflare Tunnel，并设置强 token；不要直接裸暴露 8788。
+
+## 六、数据目录
+
+凭据、会话目标、问答库、发送日志都保存在本机数据目录，不会打进安装包：
+
+- 默认 `~/.dsh/qq-free/`
+- 有 `DSH_PROFILE_DIR` 时用 `<profile>/.qq-free/`
+- 有 `DSH_HOME` 时用 `$DSH_HOME/qq-free/`
+
+## 七、卸载
+
+1. 面板「QQ AI 对话」→「停止通道」
+2. 插件列表移除 `dsh-qq-free`
+3. 按需删除数据目录
+
+## 八、和官方 QQ 插件的关系
+
+- 只用主动发言 / 问答库：可以和官方 QQ 插件同时运行
+- 用自带 AI 对话通道：必须停用官方 QQ 插件（同一个 AppID 不能有两个消息接收方）

@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "QQ free talk",
+    "description": "Official QQ bot proactive talk, group/private AI chat, a Q&A library, join welcomes, in-group join approvals, and group management (approve, mute, kick) from a web console.",
+    "detail": "docs/DETAIL.md"
+  }
+}

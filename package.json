@@ -1,0 +1,52 @@
+{
+  "name": "@local/dsh-qq-free",
+  "version": "1.14.0",
+  "private": true,
+  "type": "module",
+  "description": "QQ 官方机器人自由发言台：主动消息、DeepSeek 对话、问答库、入群欢迎与群管理，配网页控制台。",
+  "author": {
+    "name": "都有文明每天",
+    "email": "3645411938@qq.com",
+    "url": "https://github.com/chen7911012012-code"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chen7911012012-code/dsh-qq-free.git"
+  },
+  "homepage": "https://github.com/chen7911012012-code/dsh-qq-free#readme",
+  "bugs": {
+    "url": "https://github.com/chen7911012012-code/dsh-qq-free/issues"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "channel.js",
+    "remote.js",
+    "remote-page.js",
+    "cloud.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg",
+    "LICENSE",
+    "NOTICE.md",
+    "AUTHORS.md",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

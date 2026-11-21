@@ -1,0 +1,41 @@
+- insert:
+    - id: qq-free
+      name: '@local/dsh-qq-free'
+      config:
+        appId: ''
+        appSecret: ''
+        apiBase: 'https://api.sgroup.qq.com'
+        provider: 'deepseek-account'
+        model: 'deepseek-flash'
+        persona: ''
+        defaultTarget: ''
+        dailyLimit: 4
+        quietHoursStart: '23:00'
+        quietHoursEnd: '08:00'
+        autoEnabled: false
+        autoTarget: ''
+        autoIntervalMinutes: 120
+        autoTopics: ''
+        qaThreshold: 0.45
+        chatEnabled: false
+        chatPersona: ''
+        chatAgentPersona: ''
+        chatUseQa: false
+        webEnabled: false
+        webPort: 8788
+        webToken: ''
+        welcomeEnabled: false
+        welcomeText: '欢迎新成员加入本群！🎉'
+        welcomeGroups: []
+        joinNoticeEnabled: true
+        joinNoticeAvatar: true
+        replyLogFile: 'qq-replies.md'
+        moderationEnabled: true
+        moderationGroups: []
+        bannedWords: []
+        moderationMuteMinutes: 10
+        cloudEnabled: false
+        cloudUrl: ''
+        cloudUser: ''
+        cloudPass: ''
+        cloudAuto: true
