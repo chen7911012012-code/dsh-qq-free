@@ -1504,6 +1504,7 @@ export async function apply(ctx, config) {
     onGroupModeration: (data) => handleGroupModeration(data),
     onMemberBlocked: (data) => isMemberBlocked(data.groupOpenid, data.memberOpenid),
     onMentionBlocked: (data) => isMentionBlocked(data.groupOpenid, data.mentions),
+    onGroupSeen: (data) => rememberGroupTarget(data),
     logger,
   })
 
