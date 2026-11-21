@@ -7,7 +7,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { closeSync, existsSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -109,8 +109,8 @@ export function createTunnel({ dataDir, getConfig, logger }) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         const fd = openSync(lockFile(), 'wx')
+        writeSync(fd, 'pending', 0, 'utf8')
         closeSync(fd)
-        writeFileSync(lockFile(), 'pending', 'utf8')
         return { owner: true }
       } catch (error) {
         if (!error || error.code !== 'EEXIST') return { owner: true }
@@ -120,7 +120,7 @@ export function createTunnel({ dataDir, getConfig, logger }) {
         if (Number.isFinite(pid) && pid > 0 && alive(pid)) return { adopt: pid }
         try {
           const age = Date.now() - statSync(lockFile()).mtimeMs
-          if (text === 'pending' && age < 15_000) return { busy: true }
+          if ((text === 'pending' || text === '') && age < 15_000) return { busy: true }
         } catch {
           // ignore
         }
