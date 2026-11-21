@@ -1388,13 +1388,13 @@ export async function apply(ctx, config) {
 
   async function handleMemberInfo(data) {
     const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
+    const text = String(data.content ?? '').replace(/<@!?[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    if (!/^获取信息$/.test(text)) return null
+    if (isGroupFeatureBlocked(groupOpenid, 'info')) return null
     const mentions = Array.isArray(data.mentions) ? data.mentions : []
     const target = mentions.find((mention) => mention && mention.is_you !== true && mention.member_openid)
     if (!target) return '请 @ 要查询的人，例如「@某人 获取信息」。'
-    if (isGroupFeatureBlocked(groupOpenid, 'info')) return null
     const memberOpenid = String(target.member_openid)
-    const text = String(data.content ?? '').replace(/<@!?[^>]+>/g, '').replace(/\s+/g, ' ').trim()
-    if (!/^获取信息$/.test(text)) return null
     let joinedAt = ''
     let username = String(target.username ?? '')
     let source = 'local'
