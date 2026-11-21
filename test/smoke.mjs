@@ -201,7 +201,7 @@ await module.apply(ctx, {
   quietHoursStart: '23:00',
   quietHoursEnd: '08:00',
 })
-check('注册了 18 条 HTTP 路由', routes.size === 18, [...routes.keys()].join(', '))
+check('注册了 19 条 HTTP 路由', routes.size === 19, [...routes.keys()].join(', '))
 check('注册了 3 个工具', tools.length === 3)
 const qaGuidance = sections.find((section) => section.name === 'qq-free:qa-guidance')
 const qaLibrary = sections.find((section) => section.name === 'qq-free:qa-library')
@@ -230,6 +230,11 @@ result = await call('/qq-free/cloud', 'POST', {
   action: 'save', enabled: false, url: 'https://example.com/dav', user: 'tester', password: 'secret', auto: true,
 })
 check('保存 WebDAV 云端同步配置', result.status === 200 && result.body.state.cloud.user === 'tester' && result.body.state.cloud.hasPassword === true)
+
+result = await call('/qq-free/github', 'POST', {
+  action: 'save', enabled: false, owner: 'chen7911012012-code', repo: 'dsh-qq-free', token: 'test-token', auto: true,
+})
+check('保存 GitHub 直连配置', result.status === 200 && result.body.state.github.owner === 'chen7911012012-code' && result.body.state.github.hasToken === true)
 
 result = await call('/qq-free/targets', 'POST', { action: 'add', scope: 'group', openid: 'TESTGROUPOPENID12345', name: '测试群' })
 check('添加目标成功', result.status === 200)
