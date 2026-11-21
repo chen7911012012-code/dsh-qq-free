@@ -45,5 +45,6 @@
         githubToken: ''
         githubAuto: true
         creatorMode: false
+        ownerOpenid: ''
         tunnelEnabled: false
         tunnelBin: ''
