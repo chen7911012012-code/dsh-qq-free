@@ -201,7 +201,7 @@ await module.apply(ctx, {
   quietHoursStart: '23:00',
   quietHoursEnd: '08:00',
 })
-check('注册了 22 条 HTTP 路由', routes.size === 22, [...routes.keys()].join(', '))
+check('注册了 25 条 HTTP 路由', routes.size === 25, [...routes.keys()].join(', '))
 check('注册了 3 个工具', tools.length === 3)
 const qaGuidance = sections.find((section) => section.name === 'qq-free:qa-guidance')
 const qaLibrary = sections.find((section) => section.name === 'qq-free:qa-library')
@@ -412,7 +412,19 @@ if (ws) {
     d: { id: 'EV-CMD0', content: '同意 申请人', group_openid: GROUP, mentions: [], author: { member_role: 'member' } },
   })
   await sleep(100)
-  check('非管理员命令被忽略', sent.length === beforeDeny)
+  check('非管理员命令被拒绝', sent.slice(beforeDeny).some((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-CMD0' && item.body?.content?.includes('只有群主、管理员或代管')))
+
+  result = await call('/qq-free/group-managers', 'POST', { action: 'save', groupOpenid: GROUP, memberOpenid: 'DELEGATE1', name: '代管' })
+  check('添加代管', result.status === 200 && result.body.state.groupManagers.some((entry) => entry.memberOpenid === 'DELEGATE1'))
+  const beforeDelegate = sent.length
+  ws.emit({
+    op: 0, s: 8, t: 'GROUP_MESSAGE_CREATE',
+    d: { id: 'EV-DELEGATE', content: '群信息', group_openid: GROUP, mentions: [], author: { member_openid: 'DELEGATE1', member_role: 'member' } },
+  })
+  await sleep(150)
+  const delegateReply = sent.slice(beforeDelegate).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-DELEGATE')
+  check('代管可获取群信息', Boolean(delegateReply) && delegateReply.body.content.includes('群 openid：') && delegateReply.body.content.includes(GROUP))
+  await call('/qq-free/group-managers', 'POST', { action: 'remove', groupOpenid: GROUP, memberOpenid: 'DELEGATE1' })
 
   const beforeCommand = sent.length
   ws.emit({
