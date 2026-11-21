@@ -201,7 +201,7 @@ await module.apply(ctx, {
   quietHoursStart: '23:00',
   quietHoursEnd: '08:00',
 })
-check('注册了 19 条 HTTP 路由', routes.size === 19, [...routes.keys()].join(', '))
+check('注册了 20 条 HTTP 路由', routes.size === 20, [...routes.keys()].join(', '))
 check('注册了 3 个工具', tools.length === 3)
 const qaGuidance = sections.find((section) => section.name === 'qq-free:qa-guidance')
 const qaLibrary = sections.find((section) => section.name === 'qq-free:qa-library')
@@ -537,6 +537,24 @@ if (ws) {
   check('@ 被屏蔽成员的消息被忽略', sent.length === beforeMentionBlocked)
   result = await call('/qq-free/blocklist', 'POST', { action: 'remove-mention', groupOpenid: GROUP, memberOpenid: 'MENTIONBLOCK1' })
   check('取消 @ 屏蔽', result.status === 200 && !result.body.state.blockedMentions.some((entry) => entry.memberOpenid === 'MENTIONBLOCK1'))
+
+  const beforeInfo = sent.length
+  ws.emit({
+    op: 0, s: 17, t: 'GROUP_MESSAGE_CREATE',
+    d: { id: 'EV-INFO', content: '<@TARGET123456> 获取信息', group_openid: GROUP, mentions: [{ member_openid: 'TARGET123456', username: '目标' }], author: { member_openid: 'NORMALUSER1', member_role: 'member' } },
+  })
+  await sleep(150)
+  const infoReply = sent.slice(beforeInfo).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-INFO')
+  check('@某人 获取信息显示 openid 和入群时间', Boolean(infoReply) && infoReply.body.content.includes('openid：TARGET123456') && infoReply.body.content.includes('入群时间'))
+
+  result = await call('/qq-free/group-blocks', 'POST', { action: 'save', groupOpenid: GROUP, all: true, features: [] })
+  check('保存群全部屏蔽', result.status === 200 && result.body.state.groupBlocks.some((entry) => entry.groupOpenid === GROUP && entry.all === true))
+  const beforeBlockAll = sent.length
+  ws.emit({ op: 0, s: 18, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-BLOCKALL', content: '<@BOT> 你好', group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'NORMALUSER1', member_role: 'member' } } })
+  await sleep(150)
+  check('群全部屏蔽后不回复', sent.length === beforeBlockAll)
+  result = await call('/qq-free/group-blocks', 'POST', { action: 'remove', groupOpenid: GROUP })
+  check('取消群屏蔽', result.status === 200 && !result.body.state.groupBlocks.some((entry) => entry.groupOpenid === GROUP))
 }
 
 result = await call('/qq-free/channel', 'POST', { enabled: false, confirm: true })
