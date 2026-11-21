@@ -259,6 +259,8 @@ window.__ModuleLoader__.load({
       const [gmMember, setGmMember] = useState('')
       const [gmName, setGmName] = useState('')
       const [groupInfo, setGroupInfo] = useState('')
+      const [jvEnabled, setJvEnabled] = useState(null)
+      const [jvGroups, setJvGroups] = useState([])
       const [mentionMember, setMentionMember] = useState('')
       const [mentionName, setMentionName] = useState('')
       const [welcomeForm, setWelcomeForm] = useState(null)
@@ -345,6 +347,10 @@ window.__ModuleLoader__.load({
           })
         }
         if (ownerId === null) setOwnerId(data.ownerOpenid || '')
+        if (jvEnabled === null && data.joinVerify) {
+          setJvEnabled(data.joinVerify.enabled === true)
+          setJvGroups(Array.isArray(data.joinVerify.groups) ? data.joinVerify.groups : [])
+        }
         if (githubForm === null && data.github) {          setGithubForm({
             enabled: data.github.enabled === true,
             owner: data.github.owner || 'chen7911012012-code',
@@ -815,6 +821,14 @@ window.__ModuleLoader__.load({
         if (groupOpenid === '') return
         const result = await run('group-info', () => request('/qq-free/group-info', { groupOpenid }))
         if (result !== null) setGroupInfo(result.text || '')
+      }
+
+      async function saveJoinVerify() {
+        const result = await run('join-verify', () => request('/qq-free/config', {
+          joinVerifyEnabled: jvEnabled === true,
+          joinVerifyGroups: jvGroups,
+        }))
+        if (result !== null) flash('ok', '入群验证设置已保存。')
       }
 
       async function cloudAction(action) {
@@ -1910,6 +1924,38 @@ window.__ModuleLoader__.load({
                       onClick: () => void removeGroupManager(entry),
                     }, '取消'))))
                 : h('p', { className: 'qqf-empty' }, '还没有代管。')),
+
+            h(Card, {
+              title: '入群人机验证',
+              wide: true,
+              hint: '只在勾选的群生效：新成员入群后 @他 发送随机验证码，2 分钟内 @机器人 回复正确验证码通过；超时或回复错误会被移出群聊。',
+            },
+              h('label', { className: 'qqf-row' },
+                h('input', {
+                  type: 'checkbox', checked: jvEnabled === true,
+                  onChange: (event) => setJvEnabled(event.target.checked),
+                }),
+                h('span', null, '启用入群人机验证')),
+              groupTargets.length === 0
+                ? h('p', { className: 'qqf-empty' }, '先添加群聊目标。')
+                : h('div', { className: 'qqf-row' },
+                  groupTargets.map((target) => h('label', { key: target.id, className: 'qqf-row' },
+                    h('input', {
+                      type: 'checkbox', checked: jvGroups.includes(target.openid),
+                      onChange: (event) => setJvGroups(event.target.checked
+                        ? [...new Set([...jvGroups, target.openid])]
+                        : jvGroups.filter((item) => item !== target.openid)),
+                    }),
+                    h('span', null, target.name)))),
+              h('button', { className: 'qqf-btn', disabled: busy !== '', onClick: () => void saveJoinVerify() },
+                busy === 'join-verify' ? '保存中…' : '保存入群验证设置'),
+              data.joinVerifications && data.joinVerifications.length > 0
+                ? h('ul', { className: 'qqf-targets' },
+                  data.joinVerifications.map((entry) => h('li', { key: `${entry.groupOpenid}-${entry.memberOpenid}`, className: 'qqf-target' },
+                    h('div', { className: 'qqf-target-main' },
+                      h('span', { className: 'qqf-target-name' }, entry.name || entry.memberOpenid),
+                      h('span', { className: 'qqf-mono' }, `${entry.groupOpenid} · 到期 ${new Date(entry.expiresAt).toLocaleTimeString('zh-CN', { hour12: false })}`)))))
+                : h('p', { className: 'qqf-empty' }, '当前没有待验证的新成员。')),
 
             h(Card, {
               title: '群功能屏蔽',
