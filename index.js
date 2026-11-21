@@ -270,12 +270,8 @@ export async function apply(ctx, config) {
   state.lastAutoAt = Number(state.lastAutoAt) || 0
   state.lastError = typeof state.lastError === 'string' ? state.lastError : ''
   if (Array.isArray(state.pendingJoins)) {
-    const uniqueJoins = new Map()
-    for (const entry of state.pendingJoins) {
-      if (!entry || typeof entry !== 'object') continue
-      uniqueJoins.set(`${entry.groupOpenid}:${entry.memberOpenid}`, entry)
-    }
-    state.pendingJoins = [...uniqueJoins.values()].slice(-50)
+    // 同一时间只保留最新一条入群申请，旧申请直接作废
+    state.pendingJoins = state.pendingJoins.filter((entry) => entry && typeof entry === 'object').slice(-1)
   } else {
     state.pendingJoins = []
   }
@@ -999,20 +995,10 @@ export async function apply(ctx, config) {
       receivedAt: new Date().toISOString(),
     }
     if (entry.groupOpenid.length === 0 || entry.memberOpenid.length === 0) return
-    const existing = state.pendingJoins.find((item) => item.groupOpenid === entry.groupOpenid && item.memberOpenid === entry.memberOpenid)
-    if (existing) {
-      // 同一个 QQ 在同一个群只保留一条申请：更新为最新一次申请
-      const receivedAt = existing.receivedAt
-      Object.assign(existing, entry)
-      existing.receivedAt = receivedAt || entry.receivedAt
-      persistState()
-      logger.info(`qq-free: 更新入群申请 ${entry.username || entry.memberOpenid}`)
-      return
-    }
-    state.pendingJoins.push(entry)
-    state.pendingJoins = state.pendingJoins.slice(-50)
+    // 有新的入群申请时，旧的直接作废，只保留这一条
+    state.pendingJoins = [entry]
     persistState()
-    logger.info(`qq-free: 收到入群申请 ${entry.username || entry.memberOpenid}`)
+    logger.info(`qq-free: 收到入群申请 ${entry.username || entry.memberOpenid}（旧申请已作废）`)
     if (liveConfig.joinNoticeEnabled) {
       void sendJoinNotice(entry).catch((error) => {
         const message = error instanceof Error ? error.message : String(error)
