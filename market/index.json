@@ -79,11 +79,11 @@
       "versions": [
         {
           "version": "1.16.0",
-          "publishTimestamp": 1795256522,
+          "publishTimestamp": 1795256609,
           "source": {
             "type": "git",
             "url": "https://github.com/chen7911012012-code/dsh-qq-free",
-            "commit": "6c50b7ec43737490aeffca48da8d29f26d32b5ec"
+            "commit": "bbea8580fcec455f7509de11d0c84a6f8ed7d1d2"
           },
           "engines": {}
         }
