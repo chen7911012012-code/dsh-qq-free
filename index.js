@@ -1262,7 +1262,6 @@ export async function apply(ctx, config) {
     if (match === null) return null
     const approve = match[1] === '同意' || match[1] === '通过'
     const token = String(match[2] ?? '').trim()
-    const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
     const pending = state.pendingJoins.filter((entry) => entry.groupOpenid === groupOpenid)
     if (pending.length === 0) return '当前没有待处理的入群申请。'
     let entry = null
