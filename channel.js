@@ -320,6 +320,13 @@ export function createChatChannel(deps) {
 
   async function handleDispatch(type, data) {
     if (data === null || typeof data !== 'object') return
+    if (type === 'GROUP_ADD_ROBOT') {
+      status.lastEventAt = new Date().toISOString()
+      if (typeof onGroupSeen === 'function' && data.group_openid) {
+        try { onGroupSeen({ groupOpenid: data.group_openid, groupName: data.group_name }) } catch { /* ignore */ }
+      }
+      return
+    }
     if (type === 'GROUP_MEMBER_ADD') {
       status.lastEventAt = new Date().toISOString()
       if (typeof onGroupSeen === 'function' && data.group_openid) {
