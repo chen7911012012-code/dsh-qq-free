@@ -641,6 +641,7 @@ export async function apply(ctx, config) {
     if (trimmed.length > MAX_TEXT) throw new Error(`消息过长（${trimmed.length} 字），最多 ${MAX_TEXT} 字`)
     if (target.scope !== 'group' && target.scope !== 'c2c') throw new Error(`未知的会话类型：${target.scope}`)
     if (!target.openid) throw new Error('缺少目标 openid')
+    if (target.scope === 'group' && isGroupAllBlocked(target.openid)) throw new Error('这个群已屏蔽所有功能，不会发送消息')
     if (quotaExceeded(target) && meta.ignoreDailyLimit !== true) {
       throw new Error(`今天给这个会话的主动消息已达到上限（${liveConfig.dailyLimit} 条），可在「连接与模型」里调高每日配额`)
     }
@@ -748,6 +749,7 @@ export async function apply(ctx, config) {
     const cfg = liveConfig
     if (target.scope !== 'group' && target.scope !== 'c2c') throw new Error(`未知的会话类型：${target.scope}`)
     if (!target.openid) throw new Error('缺少目标 openid')
+    if (target.scope === 'group' && isGroupAllBlocked(target.openid)) throw new Error('这个群已屏蔽所有功能，不会发送媒体')
     if (quotaExceeded(target) && options.ignoreDailyLimit !== true) {
       throw new Error(`今天给这个会话的主动消息已达到上限（${liveConfig.dailyLimit} 条），可在「连接与模型」里调高每日配额`)
     }
