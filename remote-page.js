@@ -213,7 +213,7 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
         <label class="row"><input type="checkbox" id="chatEnabled" style="flex:0 0 auto"> <span>启用通道（需先停用官方 QQ 插件）</span></label>
         <label>对话人设（提问时）<textarea id="chatPersona"></textarea></label>
         <label>闲聊智能体人设（非提问时）<textarea id="chatAgentPersona"></textarea></label>
-        <label class="row"><input type="checkbox" id="chatUseQa" style="flex:0 0 auto" disabled> <span>所有问题强制走 DeepSeek（问答库仅供工具使用）</span></label>
+        <label class="row"><input type="checkbox" id="chatUseQa" style="flex:0 0 auto"> <span>优先使用问答库（命中即用库答案，未命中走 DeepSeek）</span></label>
         <button id="chatSave">保存对话设置</button>
         <div class="notice hidden" id="chatNotice"></div>
       </div>
@@ -399,7 +399,7 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
     $('chatEnabled').checked = state.chat.enabled === true
     $('chatPersona').value = state.chat.persona || ''
     $('chatAgentPersona').value = state.chat.agentPersona || ''
-    $('chatUseQa').checked = true
+    $('chatUseQa').checked = state.chat.useQa !== false
     if (state.welcome) {
       $('welcomeEnabled').checked = state.welcome.enabled === true
       $('welcomeText').value = state.welcome.text || ''
@@ -566,7 +566,7 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
     post('/api/moderation', { action: 'reset' }).then(function () { notice($('modNotice'), '已重置', 'ok') }).catch(function (e) { notice($('modNotice'), e.message, 'err') })
   }
   $('chatSave').onclick = function () {
-    post('/api/channel', { enabled: $('chatEnabled').checked, confirm: true, persona: $('chatPersona').value, agentPersona: $('chatAgentPersona').value, useQa: false })
+    post('/api/channel', { enabled: $('chatEnabled').checked, confirm: true, persona: $('chatPersona').value, agentPersona: $('chatAgentPersona').value, useQa: $('chatUseQa').checked })
       .then(function () { notice($('chatNotice'), '已保存', 'ok') }).catch(function (e) { notice($('chatNotice'), e.message, 'err') })
   }
   $('welcomeSave').onclick = function () {
