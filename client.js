@@ -1207,7 +1207,7 @@ window.__ModuleLoader__.load({
             h(Card, {
               title: '远程发言网页',
               wide: true,
-              hint: '独立 HTTP 页面，手机/外网浏览器用 token 登录后可以发文字、@成员、DeepSeek 生成和媒体。页面监听 0.0.0.0，公网暴露请配合 Tailscale / Cloudflare Tunnel，并设强 token；默认 HTTP 不加密。',
+              hint: '默认局域网使用：同一 Wi-Fi 打开 http://<本机局域网IP>:8788/?token=...，防火墙放行 TCP 8788。外网不要直接做端口映射；请安装 Tailscale 或 cloudflared 后再访问，详见安装说明。',
             },
               h('div', { className: 'qqf-row' },
                 h('label', { className: 'qqf-row' },
