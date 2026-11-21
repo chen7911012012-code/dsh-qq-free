@@ -15,7 +15,7 @@
  */
 
 import { randomBytes } from 'node:crypto'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, networkInterfaces } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -24,6 +24,7 @@ import { createRemoteServer } from './remote.js'
 import { createCloudSync } from './cloud.js'
 import { createGitHubSync } from './github.js'
 import { createTunnel } from './tunnel.js'
+import { renderVerificationImage } from './verification-image.js'
 
 export const name = 'qq-free'
 
@@ -1194,6 +1195,16 @@ export async function apply(ctx, config) {
     verificationTimers.delete(key)
     state.joinVerifications = state.joinVerifications.filter((item) => !(item.groupOpenid === entry.groupOpenid && item.memberOpenid === entry.memberOpenid))
     persistState()
+    if (entry.imagePath) {
+      try { unlinkSync(entry.imagePath) } catch { /* ignore */ }
+    }
+  }
+
+  function pauseVerification(entry) {
+    const key = verificationKey(entry.groupOpenid, entry.memberOpenid)
+    const timer = verificationTimers.get(key)
+    if (timer !== undefined) clearTimeout(timer)
+    verificationTimers.delete(key)
   }
 
   async function kickUnverified(entry, notice) {
