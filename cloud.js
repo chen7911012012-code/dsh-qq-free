@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path'
 
 const BUNDLE_NAME = 'dsh-qq-free-bundle.json'
 const ROOT_FILES = [
-  'index.js', 'channel.js', 'remote.js', 'remote-page.js', 'client.js', 'cloud.js', 'github.js', 'tunnel.js',
+  'index.js', 'channel.js', 'remote.js', 'remote-page.js', 'client.js', 'cloud.js', 'github.js', 'tunnel.js', 'verification-image.js',
   'package.json', 'cordis.patch.yml', 'icon.svg', 'README.md',
   'LICENSE', 'NOTICE.md', 'AUTHORS.md', 'CHANGELOG.md',
 ]
@@ -52,7 +52,7 @@ function collectFiles(pluginDir) {
 function safeRelative(path) {
   const value = String(path ?? '').replace(/\\/g, '/')
   if (value.startsWith('/') || value.includes('..') || value.length === 0) return null
-  if (!/^(index\.js|channel\.js|remote\.js|remote-page\.js|client\.js|cloud\.js|github\.js|tunnel\.js|package\.json|cordis\.patch\.yml|icon\.svg|README\.md|LICENSE|NOTICE\.md|AUTHORS\.md|CHANGELOG\.md|docs\/|locale\/|tools\/)/.test(value)) return null
+  if (!/^(index\.js|channel\.js|remote\.js|remote-page\.js|client\.js|cloud\.js|github\.js|tunnel\.js|verification-image\.js|package\.json|cordis\.patch\.yml|icon\.svg|README\.md|LICENSE|NOTICE\.md|AUTHORS\.md|CHANGELOG\.md|docs\/|locale\/|tools\/)/.test(value)) return null
   return value
 }
 
