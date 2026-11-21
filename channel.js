@@ -61,6 +61,9 @@ export function createChatChannel(deps) {
   const onMemberBlocked = deps.onMemberBlocked
   const onMentionBlocked = deps.onMentionBlocked
   const onGroupSeen = deps.onGroupSeen
+  const onGroupAllBlocked = deps.onGroupAllBlocked
+  const onGroupFeatureBlocked = deps.onGroupFeatureBlocked
+  const onInfoCommand = deps.onInfoCommand
   const logger = deps.logger ?? console
 
   let socket = null
@@ -368,6 +371,7 @@ export function createChatChannel(deps) {
     if (scope === 'group' && typeof onGroupSeen === 'function') {
       try { onGroupSeen({ groupOpenid: openid, groupName: data.group_name }) } catch { /* ignore */ }
     }
+    if (scope === 'group' && typeof onGroupAllBlocked === 'function' && onGroupAllBlocked(openid)) return
     const id = String(data.id ?? '')
     if (id.length === 0 || !remember(id)) return
 
@@ -395,7 +399,8 @@ export function createChatChannel(deps) {
     }
 
     // 违禁词：命中后撤回/禁言/踢人，并回一条警告，不再走 AI
-    if (scope === 'group' && typeof onGroupModeration === 'function') {
+    if (scope === 'group' && typeof onGroupModeration === 'function'
+      && !(typeof onGroupFeatureBlocked === 'function' && onGroupFeatureBlocked(openid, 'moderation'))) {
       let moderation = null
       try {
         moderation = await onGroupModeration({
@@ -425,8 +430,23 @@ export function createChatChannel(deps) {
       }
     }
 
+    // 「@某人 获取信息」：公开查询，不需要管理员
+    if (scope === 'group' && typeof onInfoCommand === 'function') {
+      let infoReply = null
+      try {
+        infoReply = await onInfoCommand(data)
+      } catch (error) {
+        logger.warn(`qq-free channel: 查询成员信息失败 ${error instanceof Error ? error.message : String(error)}`)
+      }
+      if (typeof infoReply === 'string' && infoReply.length > 0) {
+        await sendReply('group', openid, id, infoReply)
+        return
+      }
+    }
+
     // 群里管理员用「同意 / 拒绝 <申请号>」处理入群申请：走被动回复，不耗主动消息
-    if (scope === 'group' && typeof onGroupCommand === 'function') {
+    if (scope === 'group' && typeof onGroupCommand === 'function'
+      && !(typeof onGroupFeatureBlocked === 'function' && onGroupFeatureBlocked(openid, 'commands'))) {
       let commandReply = null
       try {
         commandReply = await onGroupCommand(data)
