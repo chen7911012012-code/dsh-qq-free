@@ -1370,34 +1370,34 @@ export async function apply(ctx, config) {
       const data = await groupApi('GET', `${groupPath}/join_request_list?limit=20`)
       const list = Array.isArray(data.list) ? data.list : []
       const now = new Date().toISOString()
-      for (const item of list) {
-        const joinRequestId = String(item.join_request_id ?? '')
-        const memberOpenid = String(item.member_openid ?? '')
-        if (memberOpenid.length === 0) continue
-        const existing = state.pendingJoins.find((entry) => entry.groupOpenid === groupOpenid
-          && entry.memberOpenid === memberOpenid)
-        if (existing) {
-          existing.joinRequestId = joinRequestId
-          existing.username = String(item.username ?? existing.username)
-          existing.applyAt = String(item.apply_at ?? existing.applyAt)
-          existing.verifyMessage = String(item.verify_info?.verify_message ?? existing.verifyMessage ?? '')
-        } else {
-          state.pendingJoins.push({
-            groupOpenid,
-            memberOpenid,
-            unionOpenid: String(item.union_openid ?? ''),
-            joinRequestId,
-            username: String(item.username ?? ''),
-            avatar: '',
-            applyAt: String(item.apply_at ?? ''),
-            applySource: String(item.apply_source ?? ''),
-            riskTips: String(item.risk_tips ?? ''),
-            verifyMethod: String(item.verify_info?.method ?? ''),
-            verifyMessage: String(item.verify_info?.verify_message ?? ''),
-            verifyQa: [],
-            receivedAt: now,
-          })
+      const current = state.pendingJoins[0] ?? null
+      if (current !== null) {
+        // 只更新当前这一条，其它历史申请视为已作废
+        const match = list.find((item) => String(item.member_openid ?? '') === current.memberOpenid)
+        if (match) {
+          current.joinRequestId = String(match.join_request_id ?? current.joinRequestId)
+          current.username = String(match.username ?? current.username)
+          current.applyAt = String(match.apply_at ?? current.applyAt)
+          current.verifyMessage = String(match.verify_info?.verify_message ?? current.verifyMessage ?? '')
         }
+      } else if (list.length > 0) {
+        // 本地没有待处理时，只补最新的一条
+        const latest = [...list].sort((left, right) => String(left.apply_at ?? '').localeCompare(String(right.apply_at ?? ''))).at(-1)
+        state.pendingJoins = [{
+          groupOpenid,
+          memberOpenid: String(latest.member_openid ?? ''),
+          unionOpenid: String(latest.union_openid ?? ''),
+          joinRequestId: String(latest.join_request_id ?? ''),
+          username: String(latest.username ?? ''),
+          avatar: '',
+          applyAt: String(latest.apply_at ?? ''),
+          applySource: String(latest.apply_source ?? ''),
+          riskTips: String(latest.risk_tips ?? ''),
+          verifyMethod: String(latest.verify_info?.method ?? ''),
+          verifyMessage: String(latest.verify_info?.verify_message ?? ''),
+          verifyQa: [],
+          receivedAt: now,
+        }]
       }
       persistState()
       return { list }
