@@ -579,6 +579,29 @@ if (ws) {
   check('群全部屏蔽后不回复', sent.length === beforeBlockAll)
   result = await call('/qq-free/group-blocks', 'POST', { action: 'remove', groupOpenid: GROUP })
   check('取消群屏蔽', result.status === 200 && !result.body.state.groupBlocks.some((entry) => entry.groupOpenid === GROUP))
+
+  result = await call('/qq-free/config', 'POST', { joinVerifyEnabled: true, joinVerifyGroups: [GROUP] })
+  check('开启入群验证', result.status === 200 && result.body.state.joinVerify.enabled === true)
+  const beforeVerify = sent.length
+  ws.emit({ op: 0, s: 30, t: 'GROUP_MEMBER_ADD', d: { group_openid: GROUP, member_openid: 'VERIFY1', username: '新人一', member_role: 'member', timestamp: new Date().toISOString() } })
+  await sleep(200)
+  const verifyMessage = sent.slice(beforeVerify).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.markdown?.content?.includes('验证码'))
+  const verifyCode = /验证码：(\d{6})/.exec(verifyMessage?.body?.markdown?.content ?? '')?.[1] ?? ''
+  check('新成员收到 @ 和验证码', Boolean(verifyMessage) && verifyCode.length === 6 && verifyMessage.body.markdown.content.includes('qqbot-at-user id="VERIFY1"'))
+  ws.emit({ op: 0, s: 31, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-VERIFY-OK', content: `<@BOT> ${verifyCode}`, group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'VERIFY1', member_role: 'member' } } })
+  await sleep(150)
+  check('验证码正确不踢人', !sent.slice(beforeVerify).some((item) => item.target.includes('/batch_remove_members') && JSON.stringify(item.body).includes('VERIFY1')))
+
+  const beforeWrong = sent.length
+  ws.emit({ op: 0, s: 32, t: 'GROUP_MEMBER_ADD', d: { group_openid: GROUP, member_openid: 'VERIFY2', username: '新人二', member_role: 'member', timestamp: new Date().toISOString() } })
+  await sleep(200)
+  const verifyMessage2 = sent.slice(beforeWrong).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.markdown?.content?.includes('验证码'))
+  const verifyCode2 = /验证码：(\d{6})/.exec(verifyMessage2?.body?.markdown?.content ?? '')?.[1] ?? ''
+  const wrongCode = verifyCode2 === '000000' ? '111111' : '000000'
+  ws.emit({ op: 0, s: 33, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-VERIFY-BAD', content: `<@BOT> ${wrongCode}`, group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'VERIFY2', member_role: 'member' } } })
+  await sleep(200)
+  check('验证码错误踢人', sent.slice(beforeWrong).some((item) => item.target.includes('/batch_remove_members') && JSON.stringify(item.body).includes('VERIFY2')))
+  await call('/qq-free/config', 'POST', { joinVerifyEnabled: false, joinVerifyGroups: [] })
 }
 
 result = await call('/qq-free/channel', 'POST', { enabled: false, confirm: true })
