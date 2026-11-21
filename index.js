@@ -1257,23 +1257,43 @@ export async function apply(ctx, config) {
     }
     const code = String(Math.floor(100000 + Math.random() * 900000))
     const name = String(data.username ?? data.member_nickname ?? '新成员')
+    const dir = join(DATA_DIR, 'verifications')
+    mkdirSync(dir, { recursive: true })
+    const imagePath = join(dir, `${groupOpenid}-${memberOpenid}.png`)
+    try {
+      renderVerificationImage(code, imagePath)
+    } catch (error) {
+      logger.warn(`qq-free: 生成验证码图片失败 ${error instanceof Error ? error.message : String(error)}`)
+    }
     const entry = {
       groupOpenid,
       memberOpenid,
       name,
       code,
+      imagePath,
       expiresAt: Date.now() + 120_000,
     }
     state.joinVerifications = state.joinVerifications.filter((item) => item.groupOpenid !== groupOpenid || item.memberOpenid !== memberOpenid)
     state.joinVerifications.push(entry)
     persistState()
     scheduleVerification(entry)
+    const target = { scope: 'group', openid: groupOpenid, name: '入群验证' }
     try {
-      await sendText({ scope: 'group', openid: groupOpenid, name: '入群验证' },
-        `欢迎 ${name} 加入本群！请在 2 分钟内 @机器人 回复验证码：${code}。超时或回复错误会被移出群聊。`,
+      await sendText(target,
+        `欢迎 ${name} 加入本群！请在 2 分钟内 @机器人 回复图片中的 6 位验证码。超时或回复错误会被移出群聊。`,
         { mention: memberOpenid, kind: 'join-verify', ignoreDailyLimit: true })
+      if (entry.imagePath && existsSync(entry.imagePath)) {
+        await sendMedia(target, { type: 1, path: entry.imagePath, kind: 'join-verify', ignoreDailyLimit: true })
+      } else {
+        await sendText(target, `验证码：${code}`, { kind: 'join-verify', ignoreDailyLimit: true })
+      }
     } catch (error) {
       logger.warn(`qq-free: 发送入群验证码失败 ${error instanceof Error ? error.message : String(error)}`)
+      try {
+        await sendText(target, `验证码：${code}`, { kind: 'join-verify', ignoreDailyLimit: true })
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -1291,13 +1311,17 @@ export async function apply(ctx, config) {
     const text = String(data.content ?? '').replace(/<@!?[^>]+>/g, '').replace(/\s+/g, ' ').trim()
     if (text === entry.code) {
       clearVerification(entry)
-      return { handled: true }
+      return { handled: true, reply: '验证成功' }
     }
     if (/^\d{4,8}$/.test(text)) {
-      await kickUnverified(entry)
-      return { handled: true, reply: `验证码错误，已将 ${entry.name || memberOpenid} 移出群聊。` }
+      pauseVerification(entry)
+      return {
+        handled: true,
+        reply: `验证码错误，已将 ${entry.name || '新成员'} 移出群聊。`,
+        afterReply: async () => { await kickUnverified(entry) },
+      }
     }
-    return { handled: true, reply: `请 @机器人 回复验证码：${entry.code}` }
+    return { handled: true, reply: '请 @机器人 回复图片中的 6 位验证码。' }
   }
 
   async function handleGroupCommand(data) {
