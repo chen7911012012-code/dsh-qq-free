@@ -39,3 +39,8 @@
         cloudUser: ''
         cloudPass: ''
         cloudAuto: true
+        githubEnabled: false
+        githubOwner: 'chen7911012012-code'
+        githubRepo: 'dsh-qq-free'
+        githubToken: ''
+        githubAuto: true
