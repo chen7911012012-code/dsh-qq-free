@@ -401,6 +401,13 @@ export function createChatChannel(deps) {
         if (typeof verifyResult.reply === 'string' && verifyResult.reply.length > 0) {
           await sendReply('group', openid, id, verifyResult.reply)
         }
+        if (typeof verifyResult.afterReply === 'function') {
+          try {
+            await verifyResult.afterReply()
+          } catch (error) {
+            logger.warn(`qq-free channel: 验证回复后操作失败 ${error instanceof Error ? error.message : String(error)}`)
+          }
+        }
         return
       }
     }
