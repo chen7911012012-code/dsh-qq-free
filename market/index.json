@@ -52,7 +52,7 @@
         "en": "Let an official QQ bot speak without being mentioned, with DeepSeek chat, moderation, group management and a remote console.",
         "zh": "让 QQ 官方机器人不用被 @ 也能主动开口：DeepSeek 对话、违禁词、群管理、远程控制台。"
       },
-      "icon": "https://raw.githubusercontent.com/chen7911012012-code/dsh-qq-free/main/icon.svg",
+      "icon": "https://chen7911012012-code.github.io/dsh-qq-free/icon.svg",
       "author": "都有文明每天",
       "homepage": "https://github.com/chen7911012012-code/dsh-qq-free",
       "repository": {
