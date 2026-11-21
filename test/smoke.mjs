@@ -582,14 +582,19 @@ if (ws) {
 
   result = await call('/qq-free/config', 'POST', { joinVerifyEnabled: true, joinVerifyGroups: [GROUP] })
   check('开启入群验证', result.status === 200 && result.body.state.joinVerify.enabled === true)
+  const readVerifyCode = (memberOpenid) => JSON.parse(readFileSync(join(dataRoot, '.qq-free', 'state.json'), 'utf8'))
+    .joinVerifications.find((entry) => entry.memberOpenid === memberOpenid)?.code ?? ''
   const beforeVerify = sent.length
   ws.emit({ op: 0, s: 30, t: 'GROUP_MEMBER_ADD', d: { group_openid: GROUP, member_openid: 'VERIFY01', username: '新人一', member_role: 'member', timestamp: new Date().toISOString() } })
   await sleep(200)
   const verifyMessage = sent.slice(beforeVerify).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.markdown?.content?.includes('验证码'))
-  const verifyCode = /验证码：(\d{6})/.exec(verifyMessage?.body?.markdown?.content ?? '')?.[1] ?? ''
-  check('新成员收到 @ 和验证码', Boolean(verifyMessage) && verifyCode.length === 6 && verifyMessage.body.markdown.content.includes('qqbot-at-user id="VERIFY01"'))
+  const verifyCode = readVerifyCode('VERIFY01')
+  const verifyImage = sent.slice(beforeVerify).some((item) => item.target.includes('/files') && item.body?.file_type === 1)
+  check('新成员收到 @ 和验证码图片', Boolean(verifyMessage) && verifyCode.length === 6 && verifyImage && verifyMessage.body.markdown.content.includes('qqbot-at-user id="VERIFY01"') && verifyMessage.body.markdown.content.includes('图片'))
   ws.emit({ op: 0, s: 31, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-VERIFY-OK', content: `<@BOT> ${verifyCode}`, group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'VERIFY01', member_role: 'member' } } })
   await sleep(150)
+  const successReply = sent.slice(beforeVerify).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-VERIFY-OK')
+  check('验证成功回复', successReply?.body?.content === '验证成功')
   check('验证码正确不踢人', !sent.slice(beforeVerify).some((item) => item.target.includes('/batch_remove_members') && JSON.stringify(item.body).includes('VERIFY01')))
 
   const beforeWrong = sent.length
