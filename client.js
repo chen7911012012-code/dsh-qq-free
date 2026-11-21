@@ -755,6 +755,16 @@ window.__ModuleLoader__.load({
         }
       }
 
+      async function updateAction(download) {
+        const result = await run(download ? 'update-download' : 'update-check', () => request('/qq-free/update', {
+          action: download ? 'download' : 'check',
+        }))
+        if (result !== null) {
+          setUpdateInfo(result.result)
+          flash('ok', download ? '更新包已下载。' : (result.result?.hasUpdate ? `发现新版本 ${result.result.latest}` : '已经是最新版本。'))
+        }
+      }
+
       async function githubAction(action) {
         const result = await run(`github-${action}`, () => request('/qq-free/github', action === 'save' ? {
           action: 'save',
@@ -1416,6 +1426,42 @@ window.__ModuleLoader__.load({
                   onClick: () => void memberAction('kick'),
                 }, kickArmed ? '确认踢出' : '踢出'),
                 kickArmed ? h('button', { className: 'qqf-btn qqf-btn--sm', onClick: () => setKickArmed(false) }, '取消') : null)),
+
+            h(Card, {
+              title: 'GitHub 更新',
+              wide: true,
+              hint: '从 GitHub Release 检查新版本并下载 tgz 更新包；下载后按提示重新安装。',
+            },
+              h('div', { className: 'qqf-row' },
+                h('span', { className: 'qqf-hint' }, `当前版本：${data.version || '未知'}`),
+                h('button', {
+                  className: 'qqf-btn', disabled: busy !== '',
+                  onClick: () => void updateAction(false),
+                }, busy === 'update-check' ? '检查中…' : '检查更新'),
+                h('button', {
+                  className: 'qqf-btn qqf-btn--ghost', disabled: busy !== '',
+                  onClick: () => void updateAction(true),
+                }, busy === 'update-download' ? '下载中…' : '下载最新版')),
+              updateInfo
+                ? h('div', null,
+                  h('p', { className: 'qqf-hint' },
+                    `最新版本：${updateInfo.latest}${updateInfo.hasUpdate ? '（有更新）' : '（已是最新）'}`),
+                  updateInfo.notes
+                    ? h('pre', {
+                      className: 'qqf-mono',
+                      style: { whiteSpace: 'pre-wrap', maxHeight: '180px', overflow: 'auto' },
+                    }, updateInfo.notes)
+                    : null,
+                  updateInfo.file
+                    ? h('p', { className: 'qqf-hint' }, `已下载到：${updateInfo.file}`)
+                    : null,
+                  updateInfo.installHint
+                    ? h('p', { className: 'qqf-mono' }, updateInfo.installHint)
+                    : null,
+                  updateInfo.url
+                    ? h('p', { className: 'qqf-hint' }, h('a', { href: updateInfo.url, target: '_blank', rel: 'noreferrer' }, '打开发布页'))
+                    : null)
+                : h('p', { className: 'qqf-empty' }, '点「检查更新」查看 GitHub 最新版本。')),
 
             creatorCard({
               title: '云端同步（WebDAV）',
