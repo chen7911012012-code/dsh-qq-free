@@ -1609,6 +1609,9 @@ export async function apply(ctx, config) {
     onMemberBlocked: (data) => isMemberBlocked(data.groupOpenid, data.memberOpenid),
     onMentionBlocked: (data) => isMentionBlocked(data.groupOpenid, data.mentions),
     onGroupSeen: (data) => rememberGroupTarget(data),
+    onGroupAllBlocked: (groupOpenid) => isGroupAllBlocked(groupOpenid),
+    onGroupFeatureBlocked: (groupOpenid, feature) => isGroupFeatureBlocked(groupOpenid, feature),
+    onInfoCommand: (data) => handleMemberInfo(data),
     logger,
   })
 
@@ -1719,6 +1722,9 @@ export async function apply(ctx, config) {
     },
     blocklist(body) {
       return handleBlocklist(body)
+    },
+    groupBlock(body) {
+      return handleGroupBlocks(body)
     },
     moderation(body) {
       if (String(body.action ?? 'save') === 'reset') {
@@ -2024,6 +2030,7 @@ export async function apply(ctx, config) {
       pendingJoins: state.pendingJoins.slice(-30).reverse(),
       blockedMembers: state.blockedMembers.slice(-100),
       blockedMentions: state.blockedMentions.slice(-100),
+      groupBlocks: state.groupBlocks.slice(-200),
       boards: state.boards.map((board) => ({
         id: board.id,
         name: board.name,
@@ -2384,6 +2391,17 @@ export async function apply(ctx, config) {
         if (!requirePost(req, res)) return
         const body = await readJsonBody(req)
         const result = handleBlocklist(body)
+        sendJson(res, 200, { ok: true, ...result, state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/qq-free/group-blocks',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const result = handleGroupBlocks(body)
         sendJson(res, 200, { ok: true, ...result, state: snapshot() })
       }),
     }))
