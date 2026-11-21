@@ -75,7 +75,7 @@ const DEFAULT_CONFIG = {
   joinNoticeEnabled: true,
   joinNoticeAvatar: true,
   replyLogFile: 'qq-replies.md',
-  chatUseQa: false,
+  chatUseQa: true,
   webEnabled: false,
   webPort: 8788,
   webToken: '',
@@ -435,6 +435,20 @@ export async function apply(ctx, config) {
         updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : new Date().toISOString(),
       }))
     : []
+
+  // 清理历史重复条目：同一个问题只保留最新的一条
+  {
+    const unique = new Map()
+    for (const entry of qa) {
+      const key = normalizeText(entry.question)
+      const previous = unique.get(key)
+      if (!previous || String(entry.updatedAt) >= String(previous.updatedAt)) unique.set(key, entry)
+    }
+    if (unique.size !== qa.length) {
+      qa = [...unique.values()]
+      saveQa()
+    }
+  }
 
   function saveQa() {
     writeJson(QA_FILE, qa)
