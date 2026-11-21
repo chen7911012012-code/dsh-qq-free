@@ -1,5 +1,9 @@
 # 更新日志 / Changelog
 
+## 1.18.2
+
+- 隧道启动/停止时清理所有旧 cloudflared 进程，确保只保留一个。
+
 ## 1.18.1
 
 - 修复隧道重复启动：用 `tunnel.pid` 锁保证只保留一个 cloudflared 进程。
