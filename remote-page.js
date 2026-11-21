@@ -362,8 +362,8 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
       var main = document.createElement('div'); main.className = 'item-main'
       var name = document.createElement('div'); name.className = 'q'; name.textContent = entry.username || memberId
       var meta1 = document.createElement('div'); meta1.className = 'mono'; meta1.textContent = '成员 openid：' + memberId
-      var meta2 = document.createElement('div'); meta2.className = 'mono'; meta2.textContent = '群 openid：' + groupId + (applyAt ? ' · ' + applyAt : '')
-      main.appendChild(name); main.appendChild(meta1); main.appendChild(meta2)
+      var meta2 = document.createElement('div'); meta2.className = 'mono'; meta2.textContent = applyAt ? '申请时间：' + applyAt : ''
+      main.appendChild(name); main.appendChild(meta1); if (meta2.textContent) main.appendChild(meta2)
       var actions = document.createElement('div'); actions.className = 'item-actions'
       function decide(op) {
         post('/api/group-admin', { action: op, groupOpenid: groupId, memberOpenid: memberId, joinRequestId: entry.join_request_id || entry.joinRequestId || '', operator: $('operatorName').value.trim() || '管理员' })
