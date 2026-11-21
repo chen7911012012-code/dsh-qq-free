@@ -323,6 +323,9 @@ export async function apply(ctx, config) {
   state.groupManagers = Array.isArray(state.groupManagers)
     ? state.groupManagers.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.memberOpenid === 'string').slice(-500)
     : []
+  state.joinVerifications = Array.isArray(state.joinVerifications)
+    ? state.joinVerifications.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.memberOpenid === 'string').slice(-200)
+    : []
 
   // 只保留今天的配额计数
   const today = todayKey()
@@ -1175,6 +1178,114 @@ export async function apply(ctx, config) {
     if (info?.member_count !== undefined) lines.push(`成员数：${info.member_count}`)
     if (info?.group_founder_openid) lines.push(`群主 openid：${info.group_founder_openid}`)
     return lines.join('\n')
+  }
+
+  const verificationTimers = new Map()
+
+  function verificationKey(groupOpenid, memberOpenid) {
+    return `${groupOpenid}:${memberOpenid}`
+  }
+
+  function clearVerification(entry) {
+    const key = verificationKey(entry.groupOpenid, entry.memberOpenid)
+    const timer = verificationTimers.get(key)
+    if (timer !== undefined) clearTimeout(timer)
+    verificationTimers.delete(key)
+    state.joinVerifications = state.joinVerifications.filter((item) => !(item.groupOpenid === entry.groupOpenid && item.memberOpenid === entry.memberOpenid))
+    persistState()
+  }
+
+  async function kickUnverified(entry, notice) {
+    clearVerification(entry)
+    try {
+      await groupApi('POST', `/v2/groups/${encodeURIComponent(entry.groupOpenid)}/batch_remove_members`, { member_openids: [entry.memberOpenid] })
+    } catch (error) {
+      logger.warn(`qq-free: 验证超时踢人失败 ${error instanceof Error ? error.message : String(error)}`)
+    }
+    if (notice) {
+      try {
+        await sendText({ scope: 'group', openid: entry.groupOpenid, name: '入群验证' }, notice, { kind: 'join-verify', ignoreDailyLimit: true })
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  function scheduleVerification(entry) {
+    const key = verificationKey(entry.groupOpenid, entry.memberOpenid)
+    const existing = verificationTimers.get(key)
+    if (existing !== undefined) clearTimeout(existing)
+    const delay = Math.max(0, Number(entry.expiresAt) - Date.now())
+    const timer = setTimeout(() => {
+      void kickUnverified(entry, `${entry.name || entry.memberOpenid} 未在 2 分钟内完成验证，已被移出群聊。`)
+    }, delay)
+    timer.unref?.()
+    verificationTimers.set(key, timer)
+  }
+
+  function verifyGroupEnabled(groupOpenid) {
+    if (liveConfig.joinVerifyEnabled !== true) return false
+    const groups = Array.isArray(liveConfig.joinVerifyGroups) ? liveConfig.joinVerifyGroups : []
+    return groups.includes(groupOpenid)
+  }
+
+  async function startJoinVerification(data) {
+    const groupOpenid = String(data.group_openid ?? '')
+    const memberOpenid = String(data.member_openid ?? '')
+    if (groupOpenid.length === 0 || memberOpenid.length === 0) return
+    if (!verifyGroupEnabled(groupOpenid)) return
+    const role = String(data.member_role ?? '')
+    if (role === 'admin' || role === 'owner' || isOwnerMember(memberOpenid) || isGroupDelegate(groupOpenid, memberOpenid)) return
+    const key = verificationKey(groupOpenid, memberOpenid)
+    const old = state.joinVerifications.find((item) => item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid)
+    if (old) {
+      const timer = verificationTimers.get(key)
+      if (timer !== undefined) clearTimeout(timer)
+      verificationTimers.delete(key)
+    }
+    const code = String(Math.floor(100000 + Math.random() * 900000))
+    const name = String(data.username ?? data.member_nickname ?? '新成员')
+    const entry = {
+      groupOpenid,
+      memberOpenid,
+      name,
+      code,
+      expiresAt: Date.now() + 120_000,
+    }
+    state.joinVerifications = state.joinVerifications.filter((item) => item.groupOpenid !== groupOpenid || item.memberOpenid !== memberOpenid)
+    state.joinVerifications.push(entry)
+    persistState()
+    scheduleVerification(entry)
+    try {
+      await sendText({ scope: 'group', openid: groupOpenid, name: '入群验证' },
+        `欢迎 ${name} 加入本群！请在 2 分钟内 @机器人 回复验证码：${code}。超时或回复错误会被移出群聊。`,
+        { mention: memberOpenid, kind: 'join-verify', ignoreDailyLimit: true })
+    } catch (error) {
+      logger.warn(`qq-free: 发送入群验证码失败 ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  async function handleVerifyCode(data) {
+    const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
+    const memberOpenid = String(data.author?.member_openid ?? '')
+    if (groupOpenid.length === 0 || memberOpenid.length === 0) return null
+    if (!verifyGroupEnabled(groupOpenid)) return null
+    const entry = state.joinVerifications.find((item) => item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid)
+    if (!entry) return null
+    if (Date.now() > Number(entry.expiresAt)) {
+      await kickUnverified(entry, `${entry.name || memberOpenid} 未在 2 分钟内完成验证，已被移出群聊。`)
+      return { handled: true }
+    }
+    const text = String(data.content ?? '').replace(/<@!?[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    if (text === entry.code) {
+      clearVerification(entry)
+      return { handled: true }
+    }
+    if (/^\d{4,8}$/.test(text)) {
+      await kickUnverified(entry)
+      return { handled: true, reply: `验证码错误，已将 ${entry.name || memberOpenid} 移出群聊。` }
+    }
+    return { handled: true, reply: `请 @机器人 回复验证码：${entry.code}` }
   }
 
   async function handleGroupCommand(data) {
@@ -2372,6 +2483,7 @@ export async function apply(ctx, config) {
       groupBlocks: state.groupBlocks.slice(-200),
       announcements: state.announcements.slice(-50),
       groupManagers: state.groupManagers.slice(-200),
+      joinVerifications: state.joinVerifications.map((item) => ({ groupOpenid: item.groupOpenid, memberOpenid: item.memberOpenid, name: item.name, expiresAt: item.expiresAt })),
       ownerOpenid: liveConfig.ownerOpenid || '',
       boards: state.boards.map((board) => ({
         id: board.id,
