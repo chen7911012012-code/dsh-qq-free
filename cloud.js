@@ -14,6 +14,7 @@ const BUNDLE_NAME = 'dsh-qq-free-bundle.json'
 const ROOT_FILES = [
   'index.js', 'channel.js', 'remote.js', 'remote-page.js', 'client.js', 'cloud.js',
   'package.json', 'cordis.patch.yml', 'icon.svg', 'README.md',
+  'LICENSE', 'NOTICE.md', 'AUTHORS.md',
 ]
 const ROOT_DIRS = ['docs', 'locale', 'tools']
 const IGNORE = new Set(['node_modules', '.git', 'publish', '.DS_Store'])
@@ -51,7 +52,7 @@ function collectFiles(pluginDir) {
 function safeRelative(path) {
   const value = String(path ?? '').replace(/\\/g, '/')
   if (value.startsWith('/') || value.includes('..') || value.length === 0) return null
-  if (!/^(index\.js|channel\.js|remote\.js|remote-page\.js|client\.js|cloud\.js|package\.json|cordis\.patch\.yml|icon\.svg|README\.md|docs\/|locale\/|tools\/)/.test(value)) return null
+  if (!/^(index\.js|channel\.js|remote\.js|remote-page\.js|client\.js|cloud\.js|package\.json|cordis\.patch\.yml|icon\.svg|README\.md|LICENSE|NOTICE\.md|AUTHORS\.md|docs\/|locale\/|tools\/)/.test(value)) return null
   return value
 }
 
