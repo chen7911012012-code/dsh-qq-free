@@ -1004,7 +1004,7 @@ export async function apply(ctx, config) {
     state.pendingJoins = [entry]
     persistState()
     logger.info(`qq-free: 收到入群申请 ${entry.username || entry.memberOpenid}（旧申请已作废）`)
-    if (liveConfig.joinNoticeEnabled) {
+    if (liveConfig.joinNoticeEnabled && !isGroupFeatureBlocked(entry.groupOpenid, 'joinNotice')) {
       void sendJoinNotice(entry).catch((error) => {
         const message = error instanceof Error ? error.message : String(error)
         state.lastError = `入群申请通知发送失败：${message}`
@@ -1908,7 +1908,8 @@ export async function apply(ctx, config) {
     if (!force && inQuietHours(liveConfig)) return { ok: false, error: '处于静默时段' }
     if (!force && !autoDue()) return { ok: false, error: '还没到下一句的时间' }
     const targets = resolveSavedTargets(liveConfig.autoTarget || liveConfig.defaultTarget)
-    const available = targets.filter((target) => !quotaExceeded(target))
+    const available = targets.filter((target) => !quotaExceeded(target)
+      && !(target.scope === 'group' && (isGroupAllBlocked(target.openid) || isGroupFeatureBlocked(target.openid, 'auto'))))
     if (available.length === 0) {
       lastAutoError = '已达到今日主动消息配额'
       return { ok: false, error: lastAutoError }
