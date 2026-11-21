@@ -602,7 +602,7 @@ window.__ModuleLoader__.load({
           confirm: true,
           persona: channelPersona ?? '',
           agentPersona: channelAgentPersona ?? '',
-          useQa: channelUseQa === true,
+          useQa: channelUseQa !== false,
         }))
         if (result !== null) flash('ok', '对话设置已保存。')
       }
@@ -1187,7 +1187,13 @@ window.__ModuleLoader__.load({
                   placeholder: '它闲聊时的身份、语气，例如：群里的老网友，接话自然、简短、偶尔吐槽。',
                   onChange: (event) => setChannelAgentPersona(event.target.value),
                 })),
-              h('p', { className: 'qqf-hint' }, '每条消息会先判断是不是提问：提问 → DeepSeek 准确回答；闲聊 → 用上面的智能体人设接话。'),
+              h('label', { className: 'qqf-row' },
+                h('input', {
+                  type: 'checkbox', checked: channelUseQa !== false,
+                  onChange: (event) => setChannelUseQa(event.target.checked),
+                }),
+                h('span', null, '优先使用问答库（命中即用库答案，未命中走 DeepSeek）')),
+              h('p', { className: 'qqf-hint' }, '每条消息会先判断是不是提问：提问 → 问答库命中用库答案，否则 DeepSeek；闲聊 → 用上面的智能体人设接话。'),
               h('div', { className: 'qqf-row' },
                 h('button', {
                   className: 'qqf-btn', disabled: busy !== '',
