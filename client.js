@@ -248,6 +248,9 @@ window.__ModuleLoader__.load({
       const [blockGroup, setBlockGroup] = useState('')
       const [blockMember, setBlockMember] = useState('')
       const [blockName, setBlockName] = useState('')
+      const [gbGroup, setGbGroup] = useState('')
+      const [gbAll, setGbAll] = useState(false)
+      const [gbFeatures, setGbFeatures] = useState([])
       const [mentionMember, setMentionMember] = useState('')
       const [mentionName, setMentionName] = useState('')
       const [welcomeForm, setWelcomeForm] = useState(null)
@@ -711,6 +714,25 @@ window.__ModuleLoader__.load({
           memberOpenid: entry.memberOpenid,
         }))
         if (result !== null) flash('ok', '已取消 @ 屏蔽。')
+      }
+
+      async function saveGroupBlock() {
+        if (gbGroup === '') return
+        const result = await run('group-block', () => request('/qq-free/group-blocks', {
+          action: 'save',
+          groupOpenid: gbGroup,
+          all: gbAll,
+          features: gbFeatures,
+        }))
+        if (result !== null) flash('ok', '群功能屏蔽已保存。')
+      }
+
+      async function removeGroupBlock(entry) {
+        const result = await run(`group-block-${entry.groupOpenid}`, () => request('/qq-free/group-blocks', {
+          action: 'remove',
+          groupOpenid: entry.groupOpenid,
+        }))
+        if (result !== null) flash('ok', '已取消该群屏蔽。')
       }
 
       async function cloudAction(action) {
@@ -1619,6 +1641,59 @@ window.__ModuleLoader__.load({
                       onClick: () => void removeMentionBlock(entry),
                     }, '取消'))))
                 : h('p', { className: 'qqf-empty' }, '还没有 @ 屏蔽。')),
+
+            h(Card, {
+              title: '群功能屏蔽',
+              wide: true,
+              hint: '按群屏蔽指定功能，或一键屏蔽全部功能。全部屏蔽后该群的聊天、自动发言、命令、违禁词、欢迎、入群通知、获取信息都不再响应。',
+            },
+              h('div', { className: 'qqf-row' },
+                h('select', {
+                  className: 'qqf-select qqf-grow', value: gbGroup,
+                  onChange: (event) => setGbGroup(event.target.value),
+                },
+                  h('option', { value: '' }, '选择群聊…'),
+                  groupTargets.map((target) => h('option', { key: target.id, value: target.openid }, target.name))),
+                h('label', { className: 'qqf-row' },
+                  h('input', {
+                    type: 'checkbox', checked: gbAll,
+                    onChange: (event) => setGbAll(event.target.checked),
+                  }),
+                  h('span', null, '屏蔽全部功能'))),
+              h('div', { className: 'qqf-row' },
+                [
+                  ['chat', 'AI 聊天'],
+                  ['auto', '自动发言'],
+                  ['welcome', '入群欢迎'],
+                  ['joinNotice', '入群申请通知'],
+                  ['commands', '群管理命令'],
+                  ['moderation', '违禁词'],
+                  ['info', '获取信息'],
+                ].map(([key, label]) => h('label', { key, className: 'qqf-row' },
+                  h('input', {
+                    type: 'checkbox', disabled: gbAll, checked: gbFeatures.includes(key),
+                    onChange: (event) => setGbFeatures((current) => event.target.checked
+                      ? [...new Set([...current, key])]
+                      : current.filter((item) => item !== key)),
+                  }),
+                  h('span', null, label)))),
+              h('button', {
+                className: 'qqf-btn', disabled: busy !== '' || gbGroup === '',
+                onClick: () => void saveGroupBlock(),
+              }, busy === 'group-block' ? '保存中…' : '保存群屏蔽'),
+              data.groupBlocks && data.groupBlocks.length > 0
+                ? h('ul', { className: 'qqf-targets' },
+                  data.groupBlocks.map((entry) => h('li', { key: entry.groupOpenid, className: 'qqf-target' },
+                    h('div', { className: 'qqf-target-main' },
+                      h('span', { className: 'qqf-target-name' },
+                        groupTargets.find((target) => target.openid === entry.groupOpenid)?.name || entry.groupOpenid),
+                      h('span', { className: 'qqf-mono' },
+                        entry.all ? '全部功能' : (entry.features.length > 0 ? entry.features.join(' / ') : '未选择功能'))),
+                    h('button', {
+                      className: 'qqf-btn qqf-btn--sm qqf-btn--danger', disabled: busy !== '',
+                      onClick: () => void removeGroupBlock(entry),
+                    }, '取消'))))
+                : h('p', { className: 'qqf-empty' }, '还没有群功能屏蔽。')),
 
             h(Card, {
               title: 'DeepSeek 试聊',
