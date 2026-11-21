@@ -60,6 +60,7 @@ export function createChatChannel(deps) {
   const onGroupModeration = deps.onGroupModeration
   const onMemberBlocked = deps.onMemberBlocked
   const onMentionBlocked = deps.onMentionBlocked
+  const onGroupSeen = deps.onGroupSeen
   const logger = deps.logger ?? console
 
   let socket = null
@@ -321,6 +322,9 @@ export function createChatChannel(deps) {
     if (data === null || typeof data !== 'object') return
     if (type === 'GROUP_MEMBER_ADD') {
       status.lastEventAt = new Date().toISOString()
+      if (typeof onGroupSeen === 'function' && data.group_openid) {
+        try { onGroupSeen({ groupOpenid: data.group_openid, groupName: data.group_name }) } catch { /* ignore */ }
+      }
       Promise.resolve(onMemberAdd?.(data)).catch((error) => {
         const message = error instanceof Error ? error.message : String(error)
         setStatus({ lastError: message })
@@ -330,6 +334,9 @@ export function createChatChannel(deps) {
     }
     if (type === 'GROUP_JOIN_REQUEST') {
       status.lastEventAt = new Date().toISOString()
+      if (typeof onGroupSeen === 'function' && data.group_openid) {
+        try { onGroupSeen({ groupOpenid: data.group_openid, groupName: data.group_name }) } catch { /* ignore */ }
+      }
       Promise.resolve(onJoinRequest?.(data)).catch((error) => {
         const message = error instanceof Error ? error.message : String(error)
         setStatus({ lastError: message })
@@ -351,6 +358,9 @@ export function createChatChannel(deps) {
       openid = data.author?.user_openid ?? data.author?.id
     }
     if (scope === null || typeof openid !== 'string' || openid.length === 0) return
+    if (scope === 'group' && typeof onGroupSeen === 'function') {
+      try { onGroupSeen({ groupOpenid: openid, groupName: data.group_name }) } catch { /* ignore */ }
+    }
     const id = String(data.id ?? '')
     if (id.length === 0 || !remember(id)) return
 
