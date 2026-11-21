@@ -332,6 +332,10 @@ if (ws) {
   check('回答强制走 DeepSeek 而非问答库', Boolean(groupReply) && groupReply.body.markdown.content.includes('摸鱼') && !groupReply.body.markdown.content.includes('库答案'), JSON.stringify(groupReply?.body))
   check('提问被识别并走 DeepSeek', (await call('/qq-free/state')).body.chatLog.some((entry) => entry.question === '你好' && entry.source === 'deepseek'))
 
+  ws.emit({ op: 0, s: 6, t: 'GROUP_ADD_ROBOT', d: { group_openid: 'NEWGROUPOPENID99999', group_name: '新群' } })
+  await sleep(120)
+  check('机器人被拉进新群后自动出现在目标里', (await call('/qq-free/state')).body.targets.some((target) => target.openid === 'NEWGROUPOPENID99999'))
+
   const beforeChat = sent.length
   ws.emit({ op: 0, s: 5, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-CHAT', content: '<@BOT> 今天好累', group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'ASKER1', member_role: 'member' } } })
   await sleep(180)
