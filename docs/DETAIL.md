@@ -131,7 +131,7 @@
 - 插件页：https://chen7911012012-code.github.io/dsh-qq-free/
 - 原作者：都有文明每天 · 3645411938@qq.com
 - 插件市场索引：https://chen7911012012-code.github.io/dsh-qq-free/market/index.json
-- 每次源码改动会先同步到坚果云 WebDAV；GitHub Actions `sync-webdav.yml` 每 5 分钟拉取一次并自动提交，因此 GitHub 仓库通常会在 5 分钟内跟上本地修改。
+- 每次源码改动会先同步到坚果云 WebDAV，同时面板的「GitHub 直连同步」会在约 3 秒内用 Contents API 直接提交到 GitHub；GitHub Actions `sync-webdav.yml` 每 5 分钟再拉一次 WebDAV 做兜底。
 - Release 由 `release.yml` 在打 `v*` tag 时自动构建并上传 tgz / portable zip / 安装说明。
 
 ## 配额与限制
