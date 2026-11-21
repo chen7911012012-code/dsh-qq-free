@@ -252,6 +252,8 @@ window.__ModuleLoader__.load({
       const [gbGroup, setGbGroup] = useState('')
       const [gbAll, setGbAll] = useState(false)
       const [gbFeatures, setGbFeatures] = useState([])
+      const [annForm, setAnnForm] = useState({ name: '', groups: [], date: '', time: '09:00', text: '', enabled: true })
+      const [annImage, setAnnImage] = useState(null)
       const [mentionMember, setMentionMember] = useState('')
       const [mentionName, setMentionName] = useState('')
       const [welcomeForm, setWelcomeForm] = useState(null)
@@ -737,6 +739,42 @@ window.__ModuleLoader__.load({
           groupOpenid: entry.groupOpenid,
         }))
         if (result !== null) flash('ok', '已取消该群屏蔽。')
+      }
+
+      async function saveAnnouncement() {
+        const result = await run('announcement', () => request('/qq-free/announcements', {
+          action: 'save',
+          name: annForm.name,
+          groupOpenids: annForm.groups,
+          date: annForm.date,
+          time: annForm.time,
+          text: annForm.text,
+          enabled: annForm.enabled,
+          ...(annImage ? { imageData: annImage.data, imageName: annImage.name } : {}),
+        }))
+        if (result !== null) {
+          setAnnImage(null)
+          flash('ok', '定时群公告已保存。')
+        }
+      }
+
+      async function removeAnnouncement(entry) {
+        const result = await run(`announcement-${entry.id}`, () => request('/qq-free/announcements', {
+          action: 'remove',
+          id: entry.id,
+        }))
+        if (result !== null) flash('ok', '已删除群公告。')
+      }
+
+      async function runAnnouncement(entry) {
+        const result = await run(`announcement-run-${entry.id}`, () => request('/qq-free/announcements', {
+          action: 'run',
+          id: entry.id,
+        }))
+        if (result !== null) {
+          const failed = (result.results ?? []).filter((item) => item.ok !== true)
+          flash(failed.length > 0 ? 'error' : 'ok', failed.length > 0 ? failed[0].error : '已立即发送。')
+        }
       }
 
       async function cloudAction(action) {
@@ -1561,6 +1599,86 @@ window.__ModuleLoader__.load({
                   ? `最近同步：${new Date(data.github.lastAt).toLocaleString('zh-CN', { hour12: false })} · ${data.github.lastFile || data.github.lastAction || ''}`
                   : '还没有同步记录'),
               data.github?.lastError ? h('p', { className: 'qqf-hint' }, `最近错误：${data.github.lastError}`) : null),
+
+            h(Card, {
+              title: '定时群公告（@所有人）',
+              wide: true,
+              hint: '@全体成员要求机器人是群管理员，每个群每天只能发 1 次；可同时发文字和一张图片。时间按本机时区，日期留空表示每天。',
+            },
+              h('input', {
+                className: 'qqf-input', value: annForm.name, placeholder: '公告名称（可选）',
+                onChange: (event) => setAnnForm({ ...annForm, name: event.target.value }),
+              }),
+              groupTargets.length === 0
+                ? h('p', { className: 'qqf-empty' }, '先添加群聊目标。')
+                : h('div', { className: 'qqf-row' },
+                  groupTargets.map((target) => h('label', { key: target.id, className: 'qqf-row' },
+                    h('input', {
+                      type: 'checkbox', checked: annForm.groups.includes(target.openid),
+                      onChange: (event) => setAnnForm({
+                        ...annForm,
+                        groups: event.target.checked
+                          ? [...new Set([...annForm.groups, target.openid])]
+                          : annForm.groups.filter((item) => item !== target.openid),
+                      }),
+                    }),
+                    h('span', null, target.name)))),
+              h('div', { className: 'qqf-row' },
+                h('label', { className: 'qqf-field' }, h('span', null, '日期（留空=每天）'),
+                  h('input', {
+                    className: 'qqf-input', type: 'date', value: annForm.date,
+                    onChange: (event) => setAnnForm({ ...annForm, date: event.target.value }),
+                  })),
+                h('label', { className: 'qqf-field' }, h('span', null, '时间'),
+                  h('input', {
+                    className: 'qqf-input', type: 'time', value: annForm.time,
+                    onChange: (event) => setAnnForm({ ...annForm, time: event.target.value }),
+                  }))),
+              h('textarea', {
+                className: 'qqf-textarea', value: annForm.text, placeholder: '要 @所有人 发送的文字',
+                onChange: (event) => setAnnForm({ ...annForm, text: event.target.value }),
+              }),
+              h('label', { className: 'qqf-field qqf-field--full' }, h('span', null, '图片（可选，≤5MB）'),
+                h('input', {
+                  className: 'qqf-input', type: 'file', accept: 'image/*',
+                  onChange: (event) => {
+                    const file = event.target.files?.[0]
+                    if (!file) return
+                    if (file.size > 5 * 1024 * 1024) {
+                      flash('error', '图片超过 5MB')
+                      event.target.value = ''
+                      return
+                    }
+                    const reader = new FileReader()
+                    reader.onload = () => setAnnImage({ name: file.name, data: String(reader.result || '') })
+                    reader.readAsDataURL(file)
+                    event.target.value = ''
+                  },
+                })),
+              annImage ? h('p', { className: 'qqf-hint' }, `已选图片：${annImage.name}`) : null,
+              h('button', {
+                className: 'qqf-btn', disabled: busy !== '' || annForm.groups.length === 0 || annForm.text.trim() === '',
+                onClick: () => void saveAnnouncement(),
+              }, busy === 'announcement' ? '保存中…' : '保存定时公告'),
+              data.announcements && data.announcements.length > 0
+                ? h('ul', { className: 'qqf-targets' },
+                  data.announcements.map((entry) => h('li', { key: entry.id, className: 'qqf-target' },
+                    h('div', { className: 'qqf-target-main' },
+                      h('span', { className: 'qqf-target-name' },
+                        `${entry.name || '群公告'} · ${entry.date || '每天'} ${entry.time}${entry.enabled === false ? '（已停用）' : ''}`),
+                      h('span', { className: 'qqf-mono' },
+                        `${(entry.groupOpenids || []).map((openid) => groupTargets.find((target) => target.openid === openid)?.name || openid).join(' / ')}${entry.imagePath ? ' · 含图片' : ''}`),
+                      h('span', { className: 'qqf-mono' }, entry.text)),
+                    h('div', { className: 'qqf-row' },
+                      h('button', {
+                        className: 'qqf-btn qqf-btn--sm', disabled: busy !== '',
+                        onClick: () => void runAnnouncement(entry),
+                      }, '立即发送'),
+                      h('button', {
+                        className: 'qqf-btn qqf-btn--sm qqf-btn--danger', disabled: busy !== '',
+                        onClick: () => void removeAnnouncement(entry),
+                      }, '删除')))))
+                : h('p', { className: 'qqf-empty' }, '还没有定时公告。')),
 
             h(Card, {
               title: '群板块（一次发多个群）',
