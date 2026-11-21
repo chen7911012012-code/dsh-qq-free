@@ -245,6 +245,7 @@ window.__ModuleLoader__.load({
       const [modForm, setModForm] = useState(null)
       const [cloudForm, setCloudForm] = useState(null)
       const [githubForm, setGithubForm] = useState(null)
+      const [updateInfo, setUpdateInfo] = useState(null)
       const [blockGroup, setBlockGroup] = useState('')
       const [blockMember, setBlockMember] = useState('')
       const [blockName, setBlockName] = useState('')
@@ -427,6 +428,7 @@ window.__ModuleLoader__.load({
         apply_at: item.apply_at ?? item.applyAt ?? '',
         risk_tips: item.risk_tips ?? item.riskTips ?? '',
       }))
+      const creatorCard = (props, ...children) => data.creator === true ? h(Card, props, ...children) : null
       const chatTone = chatState.enabled
         ? chatState.state === 'connected' ? 'on' : 'warn'
         : undefined
