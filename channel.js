@@ -465,6 +465,7 @@ export function createChatChannel(deps) {
     }
 
     // 群全量消息事件只有 @ 机器人的那条才处理，避免对每条群消息都插嘴
+    if (scope === 'group' && typeof onGroupFeatureBlocked === 'function' && onGroupFeatureBlocked(openid, 'chat')) return
     if (type === 'GROUP_MESSAGE_CREATE' && !mentionsBot(data)) return
     const question = stripMentions(data.content)
 
