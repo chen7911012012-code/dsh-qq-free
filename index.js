@@ -1134,6 +1134,7 @@ export async function apply(ctx, config) {
   async function handleMemberAdd(data) {
     const groupOpenid = String(data.group_openid ?? '')
     const memberOpenid = String(data.member_openid ?? '')
+    await startJoinVerification(data)
     if (groupOpenid.length > 0 && memberOpenid.length > 0) {
       state.memberJoins[`${groupOpenid}:${memberOpenid}`] = String(data.timestamp ?? new Date().toISOString())
       state.pendingJoins = state.pendingJoins.filter((item) => !(item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid))
@@ -1955,6 +1956,7 @@ export async function apply(ctx, config) {
     onGroupAllBlocked: (groupOpenid) => isGroupAllBlocked(groupOpenid),
     onGroupFeatureBlocked: (groupOpenid, feature) => isGroupFeatureBlocked(groupOpenid, feature),
     onInfoCommand: (data) => handleMemberInfo(data),
+    onVerifyCode: (data) => handleVerifyCode(data),
     logger,
   })
 
@@ -2182,6 +2184,20 @@ export async function apply(ctx, config) {
     cloud.start()
     return () => cloud.stop()
   }, 'qq-free.cloud')
+
+  ctx.effect(() => {
+    for (const entry of [...state.joinVerifications]) {
+      if (Date.now() > Number(entry.expiresAt)) {
+        void kickUnverified(entry, `${entry.name || entry.memberOpenid} 未在 2 分钟内完成验证，已被移出群聊。`)
+      } else {
+        scheduleVerification(entry)
+      }
+    }
+    return () => {
+      for (const timer of verificationTimers.values()) clearTimeout(timer)
+      verificationTimers.clear()
+    }
+  }, 'qq-free.join-verify')
 
   ctx.effect(() => {
     const tick = () => {
