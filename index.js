@@ -1983,6 +1983,18 @@ export async function apply(ctx, config) {
     return () => cloud.stop()
   }, 'qq-free.cloud')
 
+  ctx.effect(() => {
+    const tick = () => {
+      void runAnnouncements().catch((error) => {
+        logger.warn(`qq-free: 定时公告失败 ${error instanceof Error ? error.message : String(error)}`)
+      })
+    }
+    tick()
+    const timer = setInterval(tick, 20_000)
+    timer.unref?.()
+    return () => clearInterval(timer)
+  }, 'qq-free.announcements')
+
   const UPDATE_REPO = 'chen7911012012-code/dsh-qq-free'
 
   function versionParts(value) {
@@ -2648,6 +2660,23 @@ export async function apply(ctx, config) {
         if (!requirePost(req, res)) return
         const body = await readJsonBody(req)
         const result = handleBlocklist(body)
+        sendJson(res, 200, { ok: true, ...result, state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/qq-free/announcements',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req, 8 * 1024 * 1024)
+        const result = body.action === 'run'
+          ? handleAnnouncements(body)
+          : handleAnnouncements(body)
+        if (result && typeof result.then === 'function') {
+          sendJson(res, 200, { ok: true, ...(await result), state: snapshot() })
+          return
+        }
         sendJson(res, 200, { ok: true, ...result, state: snapshot() })
       }),
     }))
