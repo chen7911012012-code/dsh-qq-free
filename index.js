@@ -1571,25 +1571,17 @@ export async function apply(ctx, config) {
       })
       return { saved: true }
     },
-    qa(body) {
+    async qa(body) {
       const action = String(body.action ?? 'list')
       if (action === 'add') {
-        const question = String(body.question ?? '').trim()
-        const answer = String(body.answer ?? '').trim()
-        if (question.length === 0 || answer.length === 0) throw new Error('问题和答案都要填')
-        const entry = {
-          id: `qa-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-          question,
-          answer,
-          keywords: String(body.keywords ?? '').split(/[,，、\s]+/).filter(Boolean).slice(0, 10),
-          enabled: true,
-          hits: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-        qa.unshift(entry)
-        saveQa()
-        return { entry }
+        const saved = addQaEntry({
+          question: body.question,
+          answer: body.answer,
+          keywords: Array.isArray(body.keywords)
+            ? body.keywords
+            : String(body.keywords ?? '').split(/[,，、\s]+/).filter(Boolean),
+        })
+        return { entry: saved.entry, updated: saved.updated }
       }
       if (action === 'remove') {
         const id = String(body.id ?? '')
