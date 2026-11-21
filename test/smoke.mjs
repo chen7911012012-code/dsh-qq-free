@@ -476,7 +476,8 @@ if (ws) {
     d: { group_openid: GROUP, member_openid: 'MEMBERREQ2', join_request_id: 'JOINREQ654321', username: '另一位' },
   })
   await sleep(120)
-  check('新申请已记录', (await call('/qq-free/state')).body.pendingJoins.some((entry) => entry.memberOpenid === 'MEMBERREQ2'))
+  const replacedJoin = (await call('/qq-free/state')).body.pendingJoins
+  check('新申请让旧申请作废，只保留一条', replacedJoin.length === 1 && replacedJoin[0].memberOpenid === 'MEMBERREQ2')
   ws.emit({ op: 0, s: 13, t: 'GROUP_MEMBER_ADD', d: { group_openid: GROUP, member_openid: 'MEMBERREQ2' } })
   await sleep(120)
   check('成员入群后自动清掉申请', !(await call('/qq-free/state')).body.pendingJoins.some((entry) => entry.memberOpenid === 'MEMBERREQ2'))
