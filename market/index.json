@@ -73,17 +73,17 @@
           "deepseek"
         ],
         "sortKeys": {
-          "published": 1795236394
+          "published": 1795237637
         }
       },
       "versions": [
         {
-          "version": "1.15.1",
-          "publishTimestamp": 1795236394,
+          "version": "1.15.2",
+          "publishTimestamp": 1795237637,
           "source": {
             "type": "git",
             "url": "https://github.com/chen7911012012-code/dsh-qq-free",
-            "commit": "4056085e98d4b353bea0230e1a5e95c8cd246263"
+            "commit": "e5d1fc27e82cbcabd363cbe917a4ecba08fb230d"
           },
           "engines": {}
         }
