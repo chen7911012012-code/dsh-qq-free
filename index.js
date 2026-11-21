@@ -960,6 +960,7 @@ export async function apply(ctx, config) {
     const groupOpenid = String(data.group_openid ?? '')
     const memberOpenid = String(data.member_openid ?? '')
     if (groupOpenid.length === 0) return
+    if (isGroupFeatureBlocked(groupOpenid, 'welcome')) return
     const only = Array.isArray(liveConfig.welcomeGroups) ? liveConfig.welcomeGroups : []
     if (only.length > 0 && !only.includes(groupOpenid)) return
     let text = String(liveConfig.welcomeText ?? '').trim()
@@ -1097,9 +1098,13 @@ export async function apply(ctx, config) {
     const groupOpenid = String(data.group_openid ?? '')
     const memberOpenid = String(data.member_openid ?? '')
     if (groupOpenid.length > 0 && memberOpenid.length > 0) {
+      state.memberJoins[`${groupOpenid}:${memberOpenid}`] = String(data.timestamp ?? new Date().toISOString())
       const before = state.pendingJoins.length
       state.pendingJoins = state.pendingJoins.filter((item) => !(item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid))
-      if (state.pendingJoins.length !== before) persistState()
+      persistState()
+      if (state.pendingJoins.length !== before) void 0
+    } else {
+      persistState()
     }
     await sendWelcome(data)
   }
@@ -1331,6 +1336,86 @@ export async function apply(ctx, config) {
       const openid = String(mention.member_openid ?? '')
       return openid.length > 0 && state.blockedMentions.some((item) => item.groupOpenid === groupOpenid && item.memberOpenid === openid)
     })
+  }
+
+  const GROUP_FEATURES = ['chat', 'auto', 'welcome', 'joinNotice', 'commands', 'moderation', 'info']
+
+  function getGroupBlock(groupOpenid) {
+    return state.groupBlocks.find((item) => item.groupOpenid === groupOpenid) ?? null
+  }
+
+  function isGroupAllBlocked(groupOpenid) {
+    const block = getGroupBlock(groupOpenid)
+    return block !== null && block.all === true
+  }
+
+  function isGroupFeatureBlocked(groupOpenid, feature) {
+    const block = getGroupBlock(groupOpenid)
+    if (block === null) return false
+    if (block.all === true) return true
+    return Array.isArray(block.features) && block.features.includes(feature)
+  }
+
+  function handleGroupBlocks(body) {
+    const action = String(body.action ?? 'list')
+    if (action === 'save') {
+      const groupOpenid = assertGroupOpenid(body.groupOpenid)
+      const all = body.all === true
+      const features = Array.isArray(body.features)
+        ? [...new Set(body.features.map((item) => String(item)))].filter((item) => GROUP_FEATURES.includes(item))
+        : []
+      const existing = getGroupBlock(groupOpenid)
+      if (existing) {
+        existing.all = all
+        existing.features = features
+        existing.updatedAt = new Date().toISOString()
+      } else {
+        state.groupBlocks.push({ groupOpenid, all, features, updatedAt: new Date().toISOString() })
+      }
+      persistState()
+      return { saved: true, groupOpenid, all, features }
+    }
+    if (action === 'remove') {
+      const groupOpenid = String(body.groupOpenid ?? '')
+      const before = state.groupBlocks.length
+      state.groupBlocks = state.groupBlocks.filter((item) => item.groupOpenid !== groupOpenid)
+      if (state.groupBlocks.length === before) throw new Error('没有找到这个群的屏蔽设置')
+      persistState()
+      return { removed: true }
+    }
+    return { list: state.groupBlocks, features: GROUP_FEATURES }
+  }
+
+  async function handleMemberInfo(data) {
+    const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
+    const mentions = Array.isArray(data.mentions) ? data.mentions : []
+    const target = mentions.find((mention) => mention && mention.is_you !== true && mention.member_openid)
+    if (!target) return '请 @ 要查询的人，例如「@某人 获取信息」。'
+    if (isGroupFeatureBlocked(groupOpenid, 'info')) return null
+    const memberOpenid = String(target.member_openid)
+    const text = String(data.content ?? '').replace(/<@!?[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    if (!/^获取信息$/.test(text)) return null
+    let joinedAt = ''
+    let username = String(target.username ?? '')
+    let source = 'local'
+    try {
+      const info = await groupApi('GET', `/v2/groups/${encodeURIComponent(groupOpenid)}/members/${encodeURIComponent(memberOpenid)}`)
+      username = String(info?.username ?? username)
+      joinedAt = String(info?.joined_at ?? '')
+      source = 'api'
+    } catch {
+      // 群成员详情接口目前是内邀能力，拿不到就用本地入群事件时间
+    }
+    if (joinedAt.length === 0) {
+      joinedAt = String(state.memberJoins[`${groupOpenid}:${memberOpenid}`] ?? '')
+      source = joinedAt.length > 0 ? 'local' : 'unknown'
+    }
+    const lines = [
+      `📋 ${username || '该成员'} 的信息`,
+      `openid：${memberOpenid}`,
+      `入群时间：${joinedAt ? formatApplyTime(joinedAt) : '未知（官方成员详情接口未开放）'}`,
+    ]
+    return lines.join('\n')
   }
 
   function handleBlocklist(body) {
