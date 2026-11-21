@@ -385,6 +385,23 @@ if (ws) {
   check('通知不再出现 <@...> 或申请号', Boolean(joinNotice) && !joinNotice.body.content.includes('<@') && !joinNotice.body.content.includes('申请号'), JSON.stringify(joinNotice?.body))
   check('入群申请已记录', (await call('/qq-free/state')).body.pendingJoins.length === 1)
 
+  ws.emit({
+    op: 0, s: 7, t: 'GROUP_JOIN_REQUEST',
+    d: {
+      group_openid: GROUP,
+      member_openid: 'MEMBERREQ1',
+      union_openid: 'UNIONREQ1',
+      join_request_id: 'JOINREQ999999',
+      username: '申请人（再次申请）',
+      apply_at: '2026-11-21T00:00:00+08:00',
+      verify_info: { verify_message: '想交流', review_qa_list: [{ question: '问题', answer: '想交流' }] },
+    },
+  })
+  await sleep(120)
+  const dedupedJoin = (await call('/qq-free/state')).body.pendingJoins
+  check('同一个 QQ 的入群申请只保留一条', dedupedJoin.filter((entry) => entry.memberOpenid === 'MEMBERREQ1').length === 1
+    && dedupedJoin.find((entry) => entry.memberOpenid === 'MEMBERREQ1')?.joinRequestId === 'JOINREQ999999')
+
   result = await call('/qq-free/group-admin', 'POST', { action: 'list', groupOpenid: GROUP })
   check('拉取入群申请列表', result.status === 200 && result.body.list.length === 1 && result.body.list[0].member_openid === 'REQ2')
   check('未同意的申请不被自动删除', (await call('/qq-free/state')).body.pendingJoins.some((entry) => entry.memberOpenid === 'MEMBERREQ1'))
