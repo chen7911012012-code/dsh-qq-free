@@ -284,6 +284,8 @@ check('大文件请求体可上传（>64KB）', result.status === 200, result.bo
 
 result = await call('/qq-free/qa', 'POST', { action: 'add', question: '群规是什么', answer: '不许发广告', keywords: '群规' })
 check('添加问答成功', result.status === 200)
+result = await call('/qq-free/qa', 'POST', { action: 'add', question: '群规是什么', answer: '不许发广告（更新）', keywords: '群规' })
+check('重复问题只更新不新增', result.status === 200 && result.body.updated === true && (await call('/qq-free/qa')).body.entries.filter((entry) => entry.question === '群规是什么').length === 1)
 check('问答库进入系统提示', qaLibrary.text({}).includes('群规是什么'))
 const qaId = result.body.entry.id
 result = await call('/qq-free/qa/lookup', 'POST', { question: '这个群的群规是什么' })
