@@ -2169,6 +2169,7 @@ export async function apply(ctx, config) {
         token: liveConfig.webToken || '',
         urls: remoteUrls(Number(liveConfig.webPort) || 8788, liveConfig.webToken || ''),
         ...remoteServer.status(),
+        tunnel: tunnel.status(),
       },
       cloud: cloud.status(),
       github: githubSync.status(),
@@ -2755,6 +2756,8 @@ export async function apply(ctx, config) {
           if (!Number.isFinite(port)) throw new Error('端口不合法')
           next.webPort = Math.max(1024, Math.min(65535, Math.round(port)))
         }
+        if ('tunnelEnabled' in body) next.tunnelEnabled = body.tunnelEnabled === true
+        if (typeof body.tunnelBin === 'string') next.tunnelBin = body.tunnelBin.trim()
         if (body.regenerate === true) {
           next.webToken = randomBytes(16).toString('hex')
         } else if (typeof body.token === 'string' && body.token.trim().length > 0) {
@@ -2767,6 +2770,11 @@ export async function apply(ctx, config) {
         reloadConfig()
         if (next.webEnabled) remoteServer.start()
         else remoteServer.stop()
+        if (next.tunnelEnabled && next.webEnabled) {
+          setTimeout(() => tunnel.start(), 1200).unref?.()
+        } else {
+          tunnel.stop()
+        }
         sendJson(res, 200, { ok: true, state: snapshot() })
       }),
     }))
