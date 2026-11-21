@@ -290,6 +290,10 @@ export async function apply(ctx, config) {
   state.blockedMentions = Array.isArray(state.blockedMentions)
     ? state.blockedMentions.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.memberOpenid === 'string').slice(-500)
     : []
+  state.groupBlocks = Array.isArray(state.groupBlocks)
+    ? state.groupBlocks.filter((item) => item && typeof item.groupOpenid === 'string').slice(-200)
+    : []
+  state.memberJoins = state.memberJoins !== null && typeof state.memberJoins === 'object' ? state.memberJoins : {}
 
   // 只保留今天的配额计数
   const today = todayKey()
