@@ -20,7 +20,7 @@
         chatEnabled: false
         chatPersona: ''
         chatAgentPersona: ''
-        chatUseQa: false
+        chatUseQa: true
         webEnabled: false
         webPort: 8788
         webToken: ''
