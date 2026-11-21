@@ -309,6 +309,9 @@ export async function apply(ctx, config) {
     ? state.groupBlocks.filter((item) => item && typeof item.groupOpenid === 'string').slice(-200)
     : []
   state.memberJoins = state.memberJoins !== null && typeof state.memberJoins === 'object' ? state.memberJoins : {}
+  state.announcements = Array.isArray(state.announcements)
+    ? state.announcements.filter((item) => item && typeof item.id === 'string' && typeof item.text === 'string').slice(-100)
+    : []
 
   // 只保留今天的配额计数
   const today = todayKey()
@@ -1468,7 +1471,131 @@ export async function apply(ctx, config) {
     return { list: state.blockedMembers, mentions: state.blockedMentions }
   }
 
-  async function handleGroupAdmin(body) {
+  function announcementSlot(entry, now) {
+    if (entry.enabled === false) return ''
+    const time = String(entry.time ?? '')
+    if (!/^\d{2}:\d{2}$/.test(time)) return ''
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    if (time !== hhmm) return ''
+    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    if (String(entry.date ?? '').length > 0 && String(entry.date) !== dateKey) return ''
+    const slot = `${dateKey} ${hhmm}`
+    if (entry.lastSlot === slot) return ''
+    return slot
+  }
+
+  let announcementBusy = false
+
+  async function runAnnouncements(forceId = '') {
+    if (announcementBusy) return { skipped: true }
+    announcementBusy = true
+    const now = new Date()
+    const results = []
+    try {
+      for (const entry of state.announcements) {
+        const slot = forceId === entry.id ? `manual-${Date.now()}` : announcementSlot(entry, now)
+        if (slot.length === 0) continue
+        entry.lastSlot = slot
+        entry.lastAt = now.toISOString()
+        persistState()
+        for (const groupOpenid of Array.isArray(entry.groupOpenids) ? entry.groupOpenids : []) {
+          if (isGroupAllBlocked(groupOpenid)) {
+            results.push({ groupOpenid, ok: false, error: '该群屏蔽了所有功能' })
+            continue
+          }
+          const saved = findTarget(groupOpenid) ?? null
+          const target = { scope: 'group', openid: groupOpenid, name: saved?.name ?? '' }
+          try {
+            await sendText(target, entry.text, { kind: 'announcement', everyone: true, ignoreDailyLimit: true })
+            if (String(entry.imagePath ?? '').length > 0 && existsSync(entry.imagePath)) {
+              await sendMedia(target, { type: 1, path: entry.imagePath, ignoreDailyLimit: true })
+            }
+            results.push({ groupOpenid, ok: true })
+            appendLog({
+              at: new Date().toISOString(),
+              scope: 'group',
+              openid: groupOpenid,
+              name: saved?.name || '群公告',
+              text: entry.text,
+              ok: true,
+              kind: 'announcement',
+            })
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            results.push({ groupOpenid, ok: false, error: message })
+            appendLog({
+              at: new Date().toISOString(),
+              scope: 'group',
+              openid: groupOpenid,
+              name: saved?.name || '群公告',
+              text: entry.text,
+              ok: false,
+              error: message,
+              kind: 'announcement',
+            })
+          }
+        }
+      }
+    } finally {
+      announcementBusy = false
+    }
+    return { results }
+  }
+
+  function handleAnnouncements(body) {
+    const action = String(body.action ?? 'list')
+    if (action === 'save') {
+      const id = typeof body.id === 'string' && body.id.length > 0 ? body.id : `ann-${Date.now().toString(36)}`
+      const time = String(body.time ?? '').trim()
+      if (!/^\d{2}:\d{2}$/.test(time)) throw new Error('时间格式应为 HH:MM')
+      const date = String(body.date ?? '').trim()
+      if (date.length > 0 && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('日期格式应为 YYYY-MM-DD')
+      const text = String(body.text ?? '').trim()
+      if (text.length === 0) throw new Error('公告内容不能为空')
+      const groups = Array.isArray(body.groupOpenids)
+        ? [...new Set(body.groupOpenids.map((item) => String(item).trim()).filter(Boolean))]
+        : []
+      if (groups.length === 0) throw new Error('至少选一个群')
+      const entry = state.announcements.find((item) => item.id === id) ?? {
+        id,
+        createdAt: new Date().toISOString(),
+      }
+      entry.name = String(body.name ?? '').trim().slice(0, 60) || '群公告'
+      entry.time = time
+      entry.date = date
+      entry.groupOpenids = groups
+      entry.text = text.slice(0, 2000)
+      entry.enabled = body.enabled !== false
+      entry.imagePath = entry.imagePath ?? ''
+      if (typeof body.imageData === 'string' && body.imageData.includes('base64,')) {
+        const base64 = body.imageData.split('base64,').pop()
+        const buffer = Buffer.from(base64, 'base64')
+        if (buffer.length > 5 * 1024 * 1024) throw new Error('图片超过 5MB')
+        const dir = join(DATA_DIR, 'announcements')
+        mkdirSync(dir, { recursive: true })
+        const ext = /\.(png|jpe?g|gif|webp)$/i.exec(String(body.imageName ?? ''))?.[1] ?? 'png'
+        const file = join(dir, `${id}.${ext}`)
+        writeFileSync(file, buffer)
+        entry.imagePath = file
+      }
+      if (body.clearImage === true) entry.imagePath = ''
+      if (!state.announcements.includes(entry)) state.announcements.push(entry)
+      persistState()
+      return { entry }
+    }
+    if (action === 'remove') {
+      const id = String(body.id ?? '')
+      state.announcements = state.announcements.filter((item) => item.id !== id)
+      persistState()
+      return { removed: true }
+    }
+    if (action === 'run') {
+      return runAnnouncements(String(body.id ?? ''))
+    }
+    return { list: state.announcements }
+  }
+
+
     const action = String(body.action ?? '')
     const groupOpenid = assertGroupOpenid(body.groupOpenid)
     const groupPath = `/v2/groups/${encodeURIComponent(groupOpenid)}`
@@ -2142,6 +2269,7 @@ export async function apply(ctx, config) {
       blockedMembers: state.blockedMembers.slice(-100),
       blockedMentions: state.blockedMentions.slice(-100),
       groupBlocks: state.groupBlocks.slice(-200),
+      announcements: state.announcements.slice(-50),
       boards: state.boards.map((board) => ({
         id: board.id,
         name: board.name,
