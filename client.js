@@ -2217,6 +2217,7 @@ window.__ModuleLoader__.load({
                   ['joinNotice', '入群申请通知'],
                   ['joinRequest', '入群申请处理'],
                   ['joinVerify', '入群人机验证'],
+                  ['checkin', '群签到'],
                   ['commands', '群管理命令'],
                   ['moderation', '违禁词'],
                   ['info', '获取信息'],
