@@ -1981,6 +1981,8 @@ window.__ModuleLoader__.load({
                   ['auto', '自动发言'],
                   ['welcome', '入群欢迎'],
                   ['joinNotice', '入群申请通知'],
+                  ['joinRequest', '入群申请处理'],
+                  ['joinVerify', '入群人机验证'],
                   ['commands', '群管理命令'],
                   ['moderation', '违禁词'],
                   ['info', '获取信息'],
