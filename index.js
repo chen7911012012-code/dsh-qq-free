@@ -1417,6 +1417,16 @@ export async function apply(ctx, config) {
     if (isGroupFeatureBlocked(groupOpenid, 'joinVerify')) return null
     const entry = state.joinVerifications.find((item) => item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid)
     if (!entry) return null
+    if (entry.deferred === true) {
+      if (await isGroupAllMuted(groupOpenid)) {
+        return { handled: true, reply: '当前群仍在禁言中，禁言结束后再发送消息进行验证。' }
+      }
+      await startJoinVerification(
+        { group_openid: groupOpenid, member_openid: memberOpenid, username: entry.name },
+        { skipMuteCheck: true, minutes: 5 },
+      )
+      return { handled: true }
+    }
     if (Date.now() > Number(entry.expiresAt)) {
       await kickUnverified(entry, `${entry.name || memberOpenid} 未在 2 分钟内完成验证，已被移出群聊。`)
       return { handled: true }
