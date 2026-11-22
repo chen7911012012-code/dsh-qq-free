@@ -2392,7 +2392,12 @@ export async function apply(ctx, config) {
       status: 'ok',
       page: {
         group: { openid: page.groupOpenid, name: target?.name ?? '' },
-        permissions: { say: page.permissions?.say !== false },
+        permissions: {
+          say: page.permissions?.say !== false,
+          joinApprove: page.permissions?.joinApprove !== false,
+          memberManage: page.permissions?.memberManage !== false,
+          settings: page.permissions?.settings !== false,
+        },
         expiresAt: Number(page.expiresAt) || 0,
       },
     }
@@ -2415,7 +2420,12 @@ export async function apply(ctx, config) {
         state.groupPages.push(page)
       }
       page.expiresAt = expiresAt > 0 ? expiresAt : 0
-      page.permissions = { say: body.say !== false }
+      page.permissions = {
+        say: body.say !== false,
+        joinApprove: body.joinApprove !== false,
+        memberManage: body.memberManage !== false,
+        settings: body.settings !== false,
+      }
       persistState()
       return { page }
     }
