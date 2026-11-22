@@ -499,10 +499,11 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
   async function sendText() {
     var text = $('text').value.trim(); if (!text) return
     $('sendBtn').disabled = true
+    $('text').readOnly = true
     try {
       await post('/api/send', { targetId: $('target').value, text: text, mention: $('mention').value })
       $('text').value = ''; notice($('sendNotice'), '已发送。', 'ok')
-    } catch (e) { notice($('sendNotice'), e.message, 'err') } finally { $('sendBtn').disabled = false }
+    } catch (e) { notice($('sendNotice'), e.message, 'err') } finally { $('sendBtn').disabled = false; $('text').readOnly = false }
   }
   async function generate() {
     $('genBtn').disabled = true
