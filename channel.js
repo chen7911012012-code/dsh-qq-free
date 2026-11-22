@@ -327,6 +327,8 @@ export function createChatChannel(deps) {
 
   function isOpenModerationCommand(data) {
     const text = String(data?.content ?? '').replace(/<@!?[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    // 禁/解/踢 快捷管理，以及同意/拒绝入群申请，都不需要 @机器人
+    if (/^(同意|通过|拒绝|不同意)(\s+\S+)?$/.test(text)) return true
     if (!/^(禁|解|踢|飞)$/.test(text)) return false
     const mentions = Array.isArray(data?.mentions) ? data.mentions : []
     return mentions.some((mention) => mention && mention.is_you !== true && mention.member_openid)
@@ -511,7 +513,7 @@ export function createChatChannel(deps) {
       }
     }
 
-    // 群全量消息里，默认必须 @ 当前机器人；禁/解/踢 三个快捷指令允许不 @
+    // 群全量消息里，默认必须 @ 当前机器人；禁/解/踢、同意/拒绝 允许不 @
     if (scope === 'group' && type === 'GROUP_MESSAGE_CREATE'
       && !mentionsBot(data) && !isOpenModerationCommand(data)) return
 
