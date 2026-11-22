@@ -2559,8 +2559,15 @@ export async function apply(ctx, config) {
       })
       return { ok: true }
     }
-    if (action === 'join-verify-save') {
-      const current = Array.isArray(liveConfig.joinVerifyGroups) ? liveConfig.joinVerifyGroups : []
+    if (action === 'join-verify-cancel') {
+      let count = 0
+      for (const entry of [...state.joinVerifications].filter((item) => item.groupOpenid === groupOpenid)) {
+        clearVerification(entry)
+        count += 1
+      }
+      return { cancelled: count }
+    }
+    if (action === 'join-verify-save') {      const current = Array.isArray(liveConfig.joinVerifyGroups) ? liveConfig.joinVerifyGroups : []
       const groups = body.enabled === true
         ? [...new Set([...current, groupOpenid])]
         : current.filter((item) => item !== groupOpenid)
