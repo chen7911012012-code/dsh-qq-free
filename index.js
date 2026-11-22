@@ -1323,8 +1323,41 @@ export async function apply(ctx, config) {
   async function isGroupAllMuted(groupOpenid) {
     try {
       const data = await groupApi('GET', `/v2/groups/${encodeURIComponent(groupOpenid)}/restrict_chat_setting`)
-      const mode = String(data?.global_rule?.mode ?? 'none')
-      return mode.length > 0 && mode !== 'none'
+      const rule = data?.global_rule ?? {}
+      const mode = String(rule.mode ?? 'none')
+      if (mode.length === 0 || mode === 'none') return false
+      const now = new Date()
+      const nowMinute = now.getHours() * 60 + now.getMinutes()
+      const parseClock = (value) => {
+        const match = /^(\d{1,2}):(\d{2})$/.exec(String(value ?? ''))
+        return match ? Number(match[1]) * 60 + Number(match[2]) : null
+      }
+      const inClockRange = (start, end) => {
+        if (start === null || end === null) return false
+        if (start <= end) return nowMinute >= start && nowMinute < end
+        return nowMinute >= start || nowMinute < end
+      }
+      const weekday = now.getDay() === 0 ? 7 : now.getDay()
+      const recurring = Array.isArray(rule.recurring_rules) ? rule.recurring_rules : []
+      if (recurring.length > 0) {
+        return recurring.some((item) => {
+          if (item.enabled === false) return false
+          const days = Array.isArray(item.weekdays) ? item.weekdays.map(Number) : []
+          if (days.length > 0 && !days.includes(weekday)) return false
+          return inClockRange(parseClock(item.start_time), parseClock(item.end_time))
+        })
+      }
+      const schedules = Array.isArray(rule.schedule_rules) ? rule.schedule_rules : []
+      if (schedules.length > 0) {
+        return schedules.some((item) => {
+          if (item.enabled === false) return false
+          const start = Date.parse(String(item.start_time ?? item.start_at ?? ''))
+          const end = Date.parse(String(item.end_time ?? item.end_at ?? ''))
+          if (!Number.isFinite(start) || !Number.isFinite(end)) return false
+          return Date.now() >= start && Date.now() < end
+        })
+      }
+      return true
     } catch {
       // 查不到禁言状态时按未禁言处理，避免把新成员一直挂着
       return false
