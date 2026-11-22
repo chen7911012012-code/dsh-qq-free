@@ -1371,7 +1371,8 @@ export async function apply(ctx, config) {
     if (!verifyGroupEnabled(groupOpenid)) return
     if (isGroupFeatureBlocked(groupOpenid, 'joinVerify')) return
     const role = String(data.member_role ?? '')
-    if (role === 'admin' || role === 'owner' || isOwnerMember(memberOpenid) || isGroupDelegate(groupOpenid, memberOpenid)) return
+    // 只跳过 QQ 事件明确标记的群主/管理员；主人、代管和普通成员一样需要验证
+    if (role === 'admin' || role === 'owner') return
     const name = String(data.username ?? data.member_nickname ?? '新成员')
     if (options.skipMuteCheck !== true && await isGroupAllMuted(groupOpenid)) {
       state.joinVerifications = state.joinVerifications.filter((item) => item.groupOpenid !== groupOpenid || item.memberOpenid !== memberOpenid)
