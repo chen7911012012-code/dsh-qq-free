@@ -106,6 +106,8 @@ const DEFAULT_CONFIG = {
   ownerOpenid: '',
   joinVerifyEnabled: false,
   joinVerifyGroups: [],
+  checkinEnabled: true,
+  checkinGroups: [],
   inactiveCleanupEnabled: false,
   inactiveCleanupGroups: [],
   inactiveCleanupTime: '03:00',
@@ -184,6 +186,9 @@ function pickConfig(input) {
     } else if (key === 'inactiveCleanupGroups') {
       const list = Array.isArray(value) ? value : String(value).split(/[\n,，、\s]+/)
       out[key] = list.map((item) => String(item).trim()).filter(Boolean).slice(0, 30)
+    } else if (key === 'checkinGroups') {
+      const list = Array.isArray(value) ? value : String(value).split(/[\n,，、\s]+/)
+      out[key] = list.map((item) => String(item).trim()).filter(Boolean).slice(0, 30)
     } else if (key === 'inactiveCleanupDays') {
       out[key] = Math.max(1, Math.min(3650, Math.round(Number(value) || 30)))
     } else if (key === 'inactiveCleanupMaxLevel') {
@@ -197,6 +202,8 @@ function pickConfig(input) {
     } else if (key === 'joinVerifyEnabled') {
       out[key] = value === true || value === 'true'
     } else if (key === 'inactiveCleanupEnabled') {
+      out[key] = value === true || value === 'true'
+    } else if (key === 'checkinEnabled') {
       out[key] = value === true || value === 'true'
     } else if (key === 'cloudEnabled' || key === 'cloudAuto') {
       out[key] = value === true || value === 'true'
@@ -346,6 +353,7 @@ export async function apply(ctx, config) {
   state.groupPages = Array.isArray(state.groupPages)
     ? state.groupPages.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.token === 'string').slice(-100)
     : []
+  state.checkins = state.checkins !== null && typeof state.checkins === 'object' ? state.checkins : {}
 
   // 只保留今天的配额计数
   const today = todayKey()
@@ -1794,7 +1802,7 @@ export async function apply(ctx, config) {
     })
   }
 
-  const GROUP_FEATURES = ['chat', 'auto', 'welcome', 'joinNotice', 'joinRequest', 'joinVerify', 'commands', 'moderation', 'info']
+  const GROUP_FEATURES = ['chat', 'auto', 'welcome', 'joinNotice', 'joinRequest', 'joinVerify', 'checkin', 'commands', 'moderation', 'info']
 
   function getGroupBlock(groupOpenid) {
     return state.groupBlocks.find((item) => item.groupOpenid === groupOpenid) ?? null
