@@ -262,7 +262,7 @@ window.__ModuleLoader__.load({
       const [jvEnabled, setJvEnabled] = useState(null)
       const [jvGroups, setJvGroups] = useState([])
       const [cleanupForm, setCleanupForm] = useState(null)
-      const [gpForm, setGpForm] = useState({ groupOpenid: '', expiresAt: '', say: true })
+      const [gpForm, setGpForm] = useState({ groupOpenid: '', expiresAt: '', say: true, joinApprove: true, memberManage: true, settings: true })
       const [mentionMember, setMentionMember] = useState('')
       const [mentionName, setMentionName] = useState('')
       const [welcomeForm, setWelcomeForm] = useState(null)
@@ -867,6 +867,9 @@ window.__ModuleLoader__.load({
           groupOpenid: form.groupOpenid,
           expiresAt: form.expiresAt,
           say: form.say !== false,
+          joinApprove: form.joinApprove !== false,
+          memberManage: form.memberManage !== false,
+          settings: form.settings !== false,
         }))
         if (result !== null) flash('ok', '分群网页已保存。')
       }
@@ -2099,6 +2102,12 @@ window.__ModuleLoader__.load({
                     onChange: (event) => setGpForm({ ...gpForm, say: event.target.checked }),
                   }),
                   h('span', null, '允许机器人发言')),
+                ...['joinApprove', 'memberManage', 'settings'].map((key) => h('label', { key, className: 'qqf-row' },
+                  h('input', {
+                    type: 'checkbox', checked: gpForm[key] !== false,
+                    onChange: (event) => setGpForm({ ...gpForm, [key]: event.target.checked }),
+                  }),
+                  h('span', null, key === 'joinApprove' ? '入群审批' : key === 'memberManage' ? '成员管理' : '群设置'))),
                 h('button', {
                   className: 'qqf-btn', disabled: busy !== '' || gpForm.groupOpenid === '',
                   onClick: () => void saveGroupPage(),
