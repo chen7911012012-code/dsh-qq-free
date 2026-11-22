@@ -1172,6 +1172,7 @@ window.__ModuleLoader__.load({
                 }),
               h('textarea', {
                 className: 'qqf-textarea', value: text, maxLength: data.limits.maxText,
+                readOnly: busy === 'send',
                 placeholder: '想让它说什么？也可以先让 DeepSeek 写一句。',
                 onChange: (event) => setText(event.target.value),
               }),
