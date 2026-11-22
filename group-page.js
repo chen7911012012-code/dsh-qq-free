@@ -167,7 +167,7 @@ async function api(path, options) {
 async function act(action, body) {
   try {
     const result = await api('/gapi/action?token=' + encodeURIComponent(TOKEN), { method: 'POST', body: JSON.stringify({ action, ...(body || {}) }) });
-    await load();
+    void load();
     toast('操作成功', true);
     return result;
   } catch (error) {
