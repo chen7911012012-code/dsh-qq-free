@@ -339,7 +339,7 @@ export function createChatChannel(deps) {
     if (type === 'GROUP_ADD_ROBOT') {
       status.lastEventAt = new Date().toISOString()
       if (typeof onGroupSeen === 'function' && data.group_openid) {
-        try { onGroupSeen({ groupOpenid: data.group_openid, groupName: data.group_name }) } catch { /* ignore */ }
+        try { onGroupSeen({ groupOpenid: data.group_openid, groupName: data.group_name, defaultBlock: true }) } catch { /* ignore */ }
       }
       return
     }
