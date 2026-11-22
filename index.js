@@ -106,6 +106,11 @@ const DEFAULT_CONFIG = {
   ownerOpenid: '',
   joinVerifyEnabled: false,
   joinVerifyGroups: [],
+  inactiveCleanupEnabled: false,
+  inactiveCleanupGroups: [],
+  inactiveCleanupTime: '03:00',
+  inactiveCleanupDays: 30,
+  inactiveCleanupMaxLevel: 1,
   tunnelEnabled: false,
   tunnelBin: '',
 }
@@ -176,6 +181,13 @@ function pickConfig(input) {
     } else if (key === 'joinVerifyGroups') {
       const list = Array.isArray(value) ? value : String(value).split(/[\n,，、\s]+/)
       out[key] = list.map((item) => String(item).trim()).filter(Boolean).slice(0, 30)
+    } else if (key === 'inactiveCleanupGroups') {
+      const list = Array.isArray(value) ? value : String(value).split(/[\n,，、\s]+/)
+      out[key] = list.map((item) => String(item).trim()).filter(Boolean).slice(0, 30)
+    } else if (key === 'inactiveCleanupDays') {
+      out[key] = Math.max(1, Math.min(3650, Math.round(Number(value) || 30)))
+    } else if (key === 'inactiveCleanupMaxLevel') {
+      out[key] = Math.max(0, Math.min(100, Math.round(Number(value) || 1)))
     } else if (key === 'moderationMuteMinutes') {
       const minutes = Number(value)
       if (!Number.isFinite(minutes)) continue
@@ -183,6 +195,8 @@ function pickConfig(input) {
     } else if (key === 'moderationEnabled') {
       out[key] = value === true || value === 'true'
     } else if (key === 'joinVerifyEnabled') {
+      out[key] = value === true || value === 'true'
+    } else if (key === 'inactiveCleanupEnabled') {
       out[key] = value === true || value === 'true'
     } else if (key === 'cloudEnabled' || key === 'cloudAuto') {
       out[key] = value === true || value === 'true'
