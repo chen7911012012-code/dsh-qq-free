@@ -657,7 +657,6 @@ const remoteSend = await httpCall(`${remoteBase}/api/send`, {
 check('远程网页可发言', remoteSend.status === 200 && remoteSend.json().ok === true)
 
 result = await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: false, expiresAt: '' })
-console.log('GP DEBUG', result.status, result.body.error)
 const groupToken = result.body.state?.groupPages?.[0]?.token
 check('生成分群网页', result.status === 200 && typeof groupToken === 'string' && groupToken.length > 10)
 const gpState = await httpCall(`${remoteBase}/gapi/state?token=${encodeURIComponent(groupToken)}`)
