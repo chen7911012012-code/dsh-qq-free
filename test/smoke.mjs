@@ -420,7 +420,7 @@ if (ws) {
   const beforeDeny = sent.length
   ws.emit({
     op: 0, s: 8, t: 'GROUP_MESSAGE_CREATE',
-    d: { id: 'EV-CMD0', content: '同意 申请人', group_openid: GROUP, mentions: [], author: { member_role: 'member' } },
+    d: { id: 'EV-CMD0', content: '同意 申请人', group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_role: 'member' } },
   })
   await sleep(100)
   check('非管理员命令被拒绝', sent.slice(beforeDeny).some((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-CMD0' && item.body?.content?.includes('只有群主、管理员或代管')))
@@ -430,7 +430,7 @@ if (ws) {
   const beforeDelegate = sent.length
   ws.emit({
     op: 0, s: 8, t: 'GROUP_MESSAGE_CREATE',
-    d: { id: 'EV-DELEGATE', content: '群信息', group_openid: GROUP, mentions: [], author: { member_openid: 'DELEGATE1', member_role: 'member' } },
+    d: { id: 'EV-DELEGATE', content: '群信息', group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'DELEGATE1', member_role: 'member' } },
   })
   await sleep(150)
   const delegateReply = sent.slice(beforeDelegate).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-DELEGATE')
@@ -440,7 +440,7 @@ if (ws) {
   const beforeCommand = sent.length
   ws.emit({
     op: 0, s: 9, t: 'GROUP_MESSAGE_CREATE',
-    d: { id: 'EV-CMD1', content: '同意 申请人', group_openid: GROUP, mentions: [], author: { member_role: 'admin', member_nickname: '测试管理员' } },
+    d: { id: 'EV-CMD1', content: '同意 申请人', group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_role: 'admin', member_nickname: '测试管理员' } },
   })
   await sleep(150)
   const commandReply = sent.slice(beforeCommand).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`))
@@ -473,7 +473,7 @@ if (ws) {
     op: 0, s: 10, t: 'GROUP_MESSAGE_CREATE',
     d: {
       id: 'EV-MUTE', content: '禁言 30', group_openid: GROUP,
-      mentions: [{ member_openid: 'TARGET123456', is_you: false }],
+      mentions: [{ bot: true, is_you: true }, { member_openid: 'TARGET123456', is_you: false }],
       author: { member_openid: 'ADMIN1', member_role: 'admin' },
     },
   })
@@ -564,7 +564,7 @@ if (ws) {
   const beforeInfo = sent.length
   ws.emit({
     op: 0, s: 17, t: 'GROUP_MESSAGE_CREATE',
-    d: { id: 'EV-INFO', content: '<@TARGET123456> 获取信息', group_openid: GROUP, mentions: [{ member_openid: 'TARGET123456', username: '目标' }], author: { member_openid: 'NORMALUSER1', member_role: 'member' } },
+    d: { id: 'EV-INFO', content: '<@TARGET123456> 获取信息', group_openid: GROUP, mentions: [{ bot: true, is_you: true }, { member_openid: 'TARGET123456', username: '目标' }], author: { member_openid: 'NORMALUSER1', member_role: 'member' } },
   })
   await sleep(150)
   const infoReply = sent.slice(beforeInfo).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-INFO')
