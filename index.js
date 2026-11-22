@@ -1527,6 +1527,57 @@ export async function apply(ctx, config) {
     }
   }
 
+  const FORTUNES = [
+    '大吉：今天适合主动开口，机会比平时多。',
+    '中吉：稳扎稳打，小事会顺，别急着下结论。',
+    '小吉：会遇到一点小惊喜，耐心一点。',
+    '平：运势平稳，适合把手头的事做完。',
+    '小凶：今天少熬夜，说话慢半拍更稳。',
+    '吉：财运一般但人缘不错，适合聊聊天。',
+    '大吉：灵感在线，适合做决定。',
+    '中吉：旧问题会出现转机，别放弃。',
+  ]
+
+  function checkinDateKey(date = new Date()) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  }
+
+  function handleCheckin(data) {
+    const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
+    const memberOpenid = String(data.author?.member_openid ?? '')
+    if (groupOpenid.length === 0 || memberOpenid.length === 0) return null
+    const text = String(data.content ?? '').replace(/<@!?[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    if (!/^(签到|打卡)$/.test(text)) return null
+    if (isGroupAllBlocked(groupOpenid) || isGroupFeatureBlocked(groupOpenid, 'checkin')) return '本群已关闭签到功能。'
+    if (liveConfig.checkinEnabled !== true) return '签到功能未开启。'
+    const groups = Array.isArray(liveConfig.checkinGroups) ? liveConfig.checkinGroups : []
+    if (groups.length > 0 && !groups.includes(groupOpenid)) return '本群未开启签到。'
+    const today = checkinDateKey()
+    const key = `${groupOpenid}:${memberOpenid}`
+    const name = String(data.author?.member_nickname ?? data.author?.username ?? '').slice(0, 60)
+    const existing = state.checkins[key]
+    if (existing && existing.lastDate === today) {
+      return `今天已经签到过了。累计签到 ${Number(existing.count) || 0} 次，积分 ${Number(existing.points) || 0}。今日运势：${existing.lastFortune || '平'}`
+    }
+    const points = Math.floor(10 + Math.random() * 31)
+    const fortune = FORTUNES[Math.floor(Math.random() * FORTUNES.length)]
+    const count = (Number(existing?.count) || 0) + 1
+    const entry = {
+      groupOpenid,
+      memberOpenid,
+      name: name || existing?.name || '',
+      count,
+      points: (Number(existing?.points) || 0) + points,
+      lastDate: today,
+      lastFortune: fortune,
+      updatedAt: new Date().toISOString(),
+      history: [...(Array.isArray(existing?.history) ? existing.history : []), { date: today, points, fortune }].slice(-60),
+    }
+    state.checkins[key] = entry
+    persistState()
+    return `签到成功！获得 ${points} 积分。\n今日运势：${fortune}\n累计签到 ${count} 次，总积分 ${entry.points}。`
+  }
+
   async function handleGroupCommand(data) {
     captureTestGroupOwner(data)
     const role = String(data.author?.member_role ?? '')
@@ -3039,6 +3090,14 @@ export async function apply(ctx, config) {
         ...item,
         groupName: state.targets.find((target) => target.scope === 'group' && target.openid === item.groupOpenid)?.name ?? '',
       })),
+      checkin: {
+        enabled: liveConfig.checkinEnabled === true,
+        groups: Array.isArray(liveConfig.checkinGroups) ? liveConfig.checkinGroups : [],
+      },
+      checkins: Object.values(state.checkins)
+        .filter((item) => item && typeof item.memberOpenid === 'string')
+        .sort((left, right) => (Number(right.count) || 0) - (Number(left.count) || 0) || (Number(right.points) || 0) - (Number(left.points) || 0))
+        .slice(0, 100),
       joinVerifications: state.joinVerifications.map((item) => ({ groupOpenid: item.groupOpenid, memberOpenid: item.memberOpenid, name: item.name, expiresAt: item.expiresAt })),
       joinVerify: {
         enabled: liveConfig.joinVerifyEnabled === true,
