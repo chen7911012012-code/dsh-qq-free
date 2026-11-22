@@ -261,6 +261,7 @@ window.__ModuleLoader__.load({
       const [groupInfo, setGroupInfo] = useState('')
       const [jvEnabled, setJvEnabled] = useState(null)
       const [jvGroups, setJvGroups] = useState([])
+      const [cleanupForm, setCleanupForm] = useState(null)
       const [mentionMember, setMentionMember] = useState('')
       const [mentionName, setMentionName] = useState('')
       const [welcomeForm, setWelcomeForm] = useState(null)
@@ -350,6 +351,15 @@ window.__ModuleLoader__.load({
         if (jvEnabled === null && data.joinVerify) {
           setJvEnabled(data.joinVerify.enabled === true)
           setJvGroups(Array.isArray(data.joinVerify.groups) ? data.joinVerify.groups : [])
+        }
+        if (cleanupForm === null && data.inactiveCleanup) {
+          setCleanupForm({
+            enabled: data.inactiveCleanup.enabled === true,
+            groups: Array.isArray(data.inactiveCleanup.groups) ? data.inactiveCleanup.groups : [],
+            time: data.inactiveCleanup.time || '03:00',
+            days: data.inactiveCleanup.days || 30,
+            maxLevel: data.inactiveCleanup.maxLevel ?? 1,
+          })
         }
         if (githubForm === null && data.github) {          setGithubForm({
             enabled: data.github.enabled === true,
@@ -829,6 +839,27 @@ window.__ModuleLoader__.load({
           joinVerifyGroups: jvGroups,
         }))
         if (result !== null) flash('ok', '入群验证设置已保存。')
+      }
+
+      async function saveCleanup() {
+        if (cleanupForm === null) return
+        const result = await run('cleanup', () => request('/qq-free/config', {
+          inactiveCleanupEnabled: cleanupForm.enabled,
+          inactiveCleanupGroups: cleanupForm.groups,
+          inactiveCleanupTime: cleanupForm.time,
+          inactiveCleanupDays: Number(cleanupForm.days) || 30,
+          inactiveCleanupMaxLevel: Number(cleanupForm.maxLevel) || 1,
+        }))
+        if (result !== null) flash('ok', '沉默成员清理设置已保存。')
+      }
+
+      async function runCleanup() {
+        const result = await run('cleanup-run', () => request('/qq-free/inactive-cleanup', { action: 'run' }))
+        if (result !== null) {
+          const groups = result.results ?? []
+          flash(groups.some((item) => item.error) ? 'error' : 'ok',
+            groups.length === 0 ? '没有需要处理的群。' : `已检查 ${groups.length} 个群。`)
+        }
       }
 
       async function cloudAction(action) {
