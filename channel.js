@@ -61,6 +61,7 @@ export function createChatChannel(deps) {
   const onMemberBlocked = deps.onMemberBlocked
   const onMentionBlocked = deps.onMentionBlocked
   const onGroupSeen = deps.onGroupSeen
+  const onMemberActivity = deps.onMemberActivity
   const onGroupAllBlocked = deps.onGroupAllBlocked
   const onGroupFeatureBlocked = deps.onGroupFeatureBlocked
   const onInfoCommand = deps.onInfoCommand
@@ -371,6 +372,15 @@ export function createChatChannel(deps) {
     if (scope === null || typeof openid !== 'string' || openid.length === 0) return
     if (scope === 'group' && typeof onGroupSeen === 'function') {
       try { onGroupSeen({ groupOpenid: openid, groupName: data.group_name }) } catch { /* ignore */ }
+    }
+    if (scope === 'group' && typeof onMemberActivity === 'function') {
+      try {
+        onMemberActivity({
+          groupOpenid: openid,
+          memberOpenid: asker,
+          username: String(data.author?.member_nickname ?? data.author?.username ?? ''),
+        })
+      } catch { /* ignore */ }
     }
     if (scope === 'group' && typeof onGroupAllBlocked === 'function' && onGroupAllBlocked(openid)) return
     const id = String(data.id ?? '')
