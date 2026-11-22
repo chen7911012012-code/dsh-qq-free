@@ -2177,8 +2177,9 @@ export async function apply(ctx, config) {
         : (String(persona ?? '').trim() || personaText())
       const instruction = isChat
         ? '这是群聊里的闲聊，用你的智能体人设自然接一句，只输出回复本身，不要解释。'
-        : '对方在提问，请准确、简洁地回答，只输出回答本身，不要寒暄。'
-      const prompt = transcript.length > 0
+        : '对方在独立提问，请准确、简洁地回答，只输出回答本身，不要寒暄。'
+      // 提问一律开启新的独立对话，不携带之前的聊天历史
+      const prompt = isChat && transcript.length > 0
         ? `以下是这段 QQ 对话的历史：\n${transcript}\n用户：${question}\n${instruction}`
         : `${question}\n${instruction}`
       return generateText({ system, prompt, maxTokens: 600 })
