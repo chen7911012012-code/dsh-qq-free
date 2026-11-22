@@ -164,6 +164,11 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
       </div>
 
       <div class="card">
+        <strong style="font-size:14px">签到记录（全部同步）</strong>
+        <div class="list" id="checkinList"></div>
+      </div>
+
+      <div class="card">
         <strong style="font-size:14px">群成员操作</strong>
         <label>成员 openid<input id="memberOpenid" placeholder="member_openid"></label>
         <label>禁言分钟<input id="muteMinutes" type="number" min="1" max="43200" value="10"></label>
@@ -354,8 +359,7 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
     })
 
     var joins = $('joinList'); joins.innerHTML = ''
-    ;(state.pendingJoins || []).forEach(function (entry) {
-      var memberId = entry.member_openid || entry.memberOpenid || ''
+    ;(state.pendingJoins || []).forEach(function (entry) {      var memberId = entry.member_openid || entry.memberOpenid || ''
       var groupId = entry.group_openid || entry.groupOpenid || ''
       var applyAt = entry.apply_at || entry.applyAt || ''
       var div = document.createElement('div'); div.className = 'item'
