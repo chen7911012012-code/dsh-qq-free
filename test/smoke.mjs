@@ -613,6 +613,16 @@ if (ws) {
   const wrongReplyIndex = sent.findIndex((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-VERIFY-BAD')
   const wrongKickIndex = sent.findIndex((item) => item.target.includes('/batch_remove_members') && JSON.stringify(item.body).includes('VERIFY02'))
   check('验证码错误先回复再踢人', wrongReplyIndex >= 0 && wrongKickIndex > wrongReplyIndex && sent[wrongReplyIndex]?.body?.content?.includes('验证码错误，已将 新人二 移出群聊'))
+
+  const beforeCancel = sent.length
+  ws.emit({ op: 0, s: 34, t: 'GROUP_MEMBER_ADD', d: { group_openid: GROUP, member_openid: 'VERIFY03', username: '新人三', member_role: 'member', timestamp: new Date().toISOString() } })
+  await sleep(150)
+  result = await call('/qq-free/join-verify/cancel', 'POST', {})
+  check('取消本次验证不踢人', result.status === 200 && result.body.cancelled >= 1 && !sent.slice(beforeCancel).some((item) => item.target.includes('/batch_remove_members') && JSON.stringify(item.body).includes('VERIFY03')))
+  ws.emit({ op: 0, s: 35, t: 'GROUP_MEMBER_ADD', d: { group_openid: GROUP, member_openid: 'VERIFY04', username: '新人四', member_role: 'member', timestamp: new Date().toISOString() } })
+  await sleep(150)
+  check('取消后下一位入群仍验证', sent.slice(beforeCancel).some((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.markdown?.content?.includes('qqbot-at-user id="VERIFY04"')))
+  await call('/qq-free/join-verify/cancel', 'POST', {})
   await call('/qq-free/config', 'POST', { joinVerifyEnabled: false, joinVerifyGroups: [] })
 
   result = await call('/qq-free/config', 'POST', {
