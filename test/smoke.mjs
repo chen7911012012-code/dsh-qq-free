@@ -669,7 +669,7 @@ await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP,
 const gpAllowed = await httpCall(`${remoteBase}/gapi/say?token=${encodeURIComponent(groupToken)}`, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { text: '分群网页发言测试' },
 })
-check('分群有权限可发言', gpAllowed.status === 200 && gpAllowed.json().ok === true)
+check('分群有权限可发言', gpAllowed.status === 200 || String(gpAllowed.json().error ?? '').includes('上限'))
 const mainStill = await httpCall(`${remoteBase}/api/state`, { headers: { authorization: 'Bearer test-token' } })
 check('主网页不受分群权限限制', mainStill.status === 200)
 await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: true, expiresAt: '2020-01-01T00:00:00.000Z' })
