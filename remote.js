@@ -56,8 +56,9 @@ function json(res, status, body) {
 }
 
 import { REMOTE_PAGE } from './remote-page.js'
+import { renderGroupPage } from './group-page.js'
 
-export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMediaTargets, snapshot, api, logger }) {
+export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMediaTargets, snapshot, api, groupPage, logger }) {
   let server = null
   let boundPort = null
   let lastError = ''
@@ -85,6 +86,53 @@ export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMe
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
       res.end(REMOTE_PAGE)
+      return
+    }
+    if (url.pathname.startsWith('/g/')) {
+      const token = url.pathname.slice('/g/'.length)
+      const resolved = groupPage?.resolve ? groupPage.resolve(token) : { status: 'missing' }
+      if (resolved.status !== 'ok') {
+        const message = resolved.status === 'expired' ? '这个分群网页链接已过期。' : '分群网页不存在。'
+        res.writeHead(resolved.status === 'expired' ? 410 : 404, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+        res.end(`<!doctype html><meta charset="utf-8"><title>分群网页</title><body style="font:16px system-ui;padding:40px">${message}</body>`)
+        return
+      }
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+      res.end(renderGroupPage(token))
+      return
+    }
+    if (url.pathname === '/gapi/state' || url.pathname === '/gapi/say') {
+      const token = String(url.searchParams.get('token') ?? '')
+      const resolved = groupPage?.resolve ? groupPage.resolve(token) : { status: 'missing' }
+      if (resolved.status !== 'ok') {
+        json(res, resolved.status === 'expired' ? 410 : 401, { ok: false, error: resolved.status === 'expired' ? '链接已过期' : 'unauthorized' })
+        return
+      }
+      if (url.pathname === '/gapi/state') {
+        json(res, 200, {
+          ok: true,
+          group: resolved.page.group,
+          permissions: resolved.page.permissions,
+          expiresAt: resolved.page.expiresAt,
+        })
+        return
+      }
+      if (req.method !== 'POST') {
+        json(res, 405, { ok: false, error: 'method not allowed' })
+        return
+      }
+      if (resolved.page.permissions?.say !== true) {
+        json(res, 403, { ok: false, error: '你无权限' })
+        return
+      }
+      const body = await readBody(req)
+      const text = String(body.text ?? '')
+      if (text.trim().length === 0) {
+        json(res, 400, { ok: false, error: '消息不能为空' })
+        return
+      }
+      const results = await groupPage.say(token, text)
+      json(res, 200, { ok: true, results })
       return
     }
     if (!url.pathname.startsWith('/api/')) {
