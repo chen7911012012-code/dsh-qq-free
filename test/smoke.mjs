@@ -625,6 +625,20 @@ if (ws) {
   await call('/qq-free/join-verify/cancel', 'POST', {})
   await call('/qq-free/config', 'POST', { joinVerifyEnabled: false, joinVerifyGroups: [] })
 
+  result = await call('/qq-free/config', 'POST', { checkinEnabled: true, checkinGroups: [GROUP] })
+  check('开启签到', result.status === 200 && result.body.state.checkin.enabled === true)
+  const beforeCheckin = sent.length
+  ws.emit({ op: 0, s: 36, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-CHECKIN', content: '<@BOT> 签到', group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'CHECKIN1', member_nickname: '签到员', member_role: 'member' } } })
+  await sleep(150)
+  const checkinReply = sent.slice(beforeCheckin).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-CHECKIN')
+  check('签到获得积分和今日运势', Boolean(checkinReply) && JSON.stringify(checkinReply.body).includes('签到成功') && JSON.stringify(checkinReply.body).includes('今日运势'))
+  ws.emit({ op: 0, s: 37, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-CHECKIN2', content: '<@BOT> 签到', group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'CHECKIN1', member_nickname: '签到员', member_role: 'member' } } })
+  await sleep(150)
+  const againReply = sent.slice(beforeCheckin).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-CHECKIN2')
+  check('同一天重复签到被拒绝', Boolean(againReply) && JSON.stringify(againReply.body).includes('已经签到'))
+  check('签到数据保存在本地', (await call('/qq-free/state')).body.checkins.some((entry) => entry.memberOpenid === 'CHECKIN1' && entry.count === 1))
+  await call('/qq-free/config', 'POST', { checkinEnabled: false, checkinGroups: [] })
+
   result = await call('/qq-free/config', 'POST', {
     inactiveCleanupEnabled: true, inactiveCleanupGroups: [GROUP], inactiveCleanupTime: '03:00', inactiveCleanupDays: 1, inactiveCleanupMaxLevel: 1,
   })
