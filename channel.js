@@ -475,11 +475,9 @@ export function createChatChannel(deps) {
       }
     }
 
-    // 群全量消息里，只有 @ 当前机器人的消息才继续处理命令/问答；@ 其他机器人不响应
-    if (scope === 'group' && type === 'GROUP_MESSAGE_CREATE' && !mentionsBot(data)) return
-
-    // 「@某人 获取信息」：公开查询，不需要管理员
-    if (scope === 'group' && typeof onInfoCommand === 'function') {
+    // 「@某人 获取信息」：公开查询，不需要管理员；群全量消息必须 @ 当前机器人
+    if (scope === 'group' && typeof onInfoCommand === 'function'
+      && (type !== 'GROUP_MESSAGE_CREATE' || mentionsBot(data))) {
       let infoReply = null
       try {
         infoReply = await onInfoCommand(data)
@@ -505,6 +503,9 @@ export function createChatChannel(deps) {
         return
       }
     }
+
+    // 群全量消息里，只有 @ 当前机器人的消息才继续处理命令/问答；@ 其他机器人不响应
+    if (scope === 'group' && type === 'GROUP_MESSAGE_CREATE' && !mentionsBot(data)) return
 
     // 群里管理员用「同意 / 拒绝 <申请号>」处理入群申请：走被动回复，不耗主动消息
     if (scope === 'group' && typeof onGroupCommand === 'function'
