@@ -262,6 +262,7 @@ window.__ModuleLoader__.load({
       const [jvEnabled, setJvEnabled] = useState(null)
       const [jvGroups, setJvGroups] = useState([])
       const [cleanupForm, setCleanupForm] = useState(null)
+      const [gpForm, setGpForm] = useState({ groupOpenid: '', expiresAt: '', say: true })
       const [mentionMember, setMentionMember] = useState('')
       const [mentionName, setMentionName] = useState('')
       const [welcomeForm, setWelcomeForm] = useState(null)
@@ -851,6 +852,40 @@ window.__ModuleLoader__.load({
           inactiveCleanupMaxLevel: Number(cleanupForm.maxLevel) || 1,
         }))
         if (result !== null) flash('ok', '沉默成员清理设置已保存。')
+      }
+
+      async function cancelVerifications() {
+        const result = await run('join-verify-cancel', () => request('/qq-free/join-verify/cancel', {}))
+        if (result !== null) flash('ok', `已取消 ${result.cancelled ?? 0} 个待验证成员，下一位入群仍会验证。`)
+      }
+
+      async function saveGroupPage(overrides = {}) {
+        const form = { ...gpForm, ...overrides }
+        if (form.groupOpenid === '') return
+        const result = await run('group-page', () => request('/qq-free/group-pages', {
+          action: 'save',
+          groupOpenid: form.groupOpenid,
+          expiresAt: form.expiresAt,
+          say: form.say !== false,
+        }))
+        if (result !== null) flash('ok', '分群网页已保存。')
+      }
+
+      async function removeGroupPage(entry) {
+        const result = await run(`group-page-${entry.groupOpenid}`, () => request('/qq-free/group-pages', {
+          action: 'remove',
+          groupOpenid: entry.groupOpenid,
+        }))
+        if (result !== null) flash('ok', '分群网页已删除。')
+      }
+
+      async function copyText(text) {
+        try {
+          await navigator.clipboard.writeText(text)
+          flash('ok', '链接已复制。')
+        } catch {
+          flash('error', '复制失败，请手动复制。')
+        }
       }
 
       async function runCleanup() {
@@ -1980,6 +2015,8 @@ window.__ModuleLoader__.load({
                     h('span', null, target.name)))),
               h('button', { className: 'qqf-btn', disabled: busy !== '', onClick: () => void saveJoinVerify() },
                 busy === 'join-verify' ? '保存中…' : '保存入群验证设置'),
+              h('button', { className: 'qqf-btn qqf-btn--ghost', disabled: busy !== '', onClick: () => void cancelVerifications() },
+                busy === 'join-verify-cancel' ? '取消中…' : '取消本次验证'),
               data.joinVerifications && data.joinVerifications.length > 0
                 ? h('ul', { className: 'qqf-targets' },
                   data.joinVerifications.map((entry) => h('li', { key: `${entry.groupOpenid}-${entry.memberOpenid}`, className: 'qqf-target' },
