@@ -661,6 +661,16 @@ const groupToken = result.body.state?.groupPages?.[0]?.token
 check('生成分群网页', result.status === 200 && typeof groupToken === 'string' && groupToken.length > 10)
 const gpState = await httpCall(`${remoteBase}/gapi/state?token=${encodeURIComponent(groupToken)}`)
 check('分群网页状态可读', gpState.status === 200 && gpState.json().permissions?.say === false)
+const gpOverview = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
+check('分群网页可读完整管理数据', gpOverview.status === 200 && gpOverview.json().ok === true && Array.isArray(gpOverview.json().features))
+await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: false, joinApprove: false, memberManage: false, settings: false, expiresAt: '' })
+const gpJoinDenied = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'join-approve', memberOpenid: 'MEMBERX1', approve: true },
+})
+const gpSettingDenied = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'save-blocks', features: [] },
+})
+check('分群审批/设置权限可关闭', gpJoinDenied.status === 403 && gpSettingDenied.status === 403)
 const gpDenied = await httpCall(`${remoteBase}/gapi/say?token=${encodeURIComponent(groupToken)}`, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { text: '越权发言' },
 })
