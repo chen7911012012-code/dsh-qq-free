@@ -2489,7 +2489,7 @@ export async function apply(ctx, config) {
     const groupOpenid = resolved.page.group.openid
     const name = resolved.page.group.name
     const permissions = resolved.page.permissions
-    const need = /^join/.test(action)
+    const need = action === 'join-approve'
       ? 'joinApprove'
       : /^(mute|unmute|kick)/.test(action)
         ? 'memberManage'
@@ -2656,6 +2656,8 @@ export async function apply(ctx, config) {
     groupPage: {
       resolve: (token) => resolveGroupPage(token),
       say: (token, text) => sayGroupPage(token, text),
+      overview: (token) => groupPageOverview(token),
+      action: (token, action, body) => groupPageAction(token, action, body),
     },
     logger,
   })
