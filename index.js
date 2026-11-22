@@ -2402,7 +2402,6 @@ export async function apply(ctx, config) {
     const action = String(body.action ?? 'list')
     if (action === 'save') {
       const groupOpenid = assertGroupOpenid(body.groupOpenid)
-      if (!findTarget(groupOpenid)) throw new Error('请先添加这个群')
       const expiresRaw = String(body.expiresAt ?? '').trim()
       const expiresAt = expiresRaw.length > 0 ? Date.parse(expiresRaw) : 0
       if (expiresRaw.length > 0 && !Number.isFinite(expiresAt)) throw new Error('有效期格式不正确')
