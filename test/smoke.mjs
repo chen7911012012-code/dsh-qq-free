@@ -614,6 +614,14 @@ if (ws) {
   const wrongKickIndex = sent.findIndex((item) => item.target.includes('/batch_remove_members') && JSON.stringify(item.body).includes('VERIFY02'))
   check('验证码错误先回复再踢人', wrongReplyIndex >= 0 && wrongKickIndex > wrongReplyIndex && sent[wrongReplyIndex]?.body?.content?.includes('验证码错误，已将 新人二 移出群聊'))
   await call('/qq-free/config', 'POST', { joinVerifyEnabled: false, joinVerifyGroups: [] })
+
+  result = await call('/qq-free/config', 'POST', {
+    inactiveCleanupEnabled: true, inactiveCleanupGroups: [GROUP], inactiveCleanupTime: '03:00', inactiveCleanupDays: 1, inactiveCleanupMaxLevel: 1,
+  })
+  check('保存沉默清理设置', result.status === 200 && result.body.state.inactiveCleanup.enabled === true)
+  result = await call('/qq-free/inactive-cleanup', 'POST', { action: 'run' })
+  check('沉默清理立即检查不报错', result.status === 200 && Array.isArray(result.body.results))
+  await call('/qq-free/config', 'POST', { inactiveCleanupEnabled: false, inactiveCleanupGroups: [] })
 }
 
 result = await call('/qq-free/channel', 'POST', { enabled: false, confirm: true })
