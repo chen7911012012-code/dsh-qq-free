@@ -321,7 +321,8 @@ export function createChatChannel(deps) {
 
   function mentionsBot(data) {
     const mentions = Array.isArray(data?.mentions) ? data.mentions : []
-    return mentions.some((mention) => mention && (mention.is_you === true || mention.bot === true))
+    // 只认当前机器人被 @；其他机器人也会带 bot:true，不能用它判断
+    return mentions.some((mention) => mention && mention.is_you === true)
   }
 
   async function handleDispatch(type, data) {
@@ -473,6 +474,9 @@ export function createChatChannel(deps) {
         return
       }
     }
+
+    // 群全量消息里，只有 @ 当前机器人的消息才继续处理命令/问答；@ 其他机器人不响应
+    if (scope === 'group' && type === 'GROUP_MESSAGE_CREATE' && !mentionsBot(data)) return
 
     // 「@某人 获取信息」：公开查询，不需要管理员
     if (scope === 'group' && typeof onInfoCommand === 'function') {
