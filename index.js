@@ -2450,6 +2450,193 @@ export async function apply(ctx, config) {
     return results
   }
 
+  async function groupPageOverview(token) {
+    const resolved = resolveGroupPage(token)
+    if (resolved.status !== 'ok') throw new Error(resolved.status === 'expired' ? '链接已过期' : '分群网页不存在')
+    const groupOpenid = resolved.page.group.openid
+    const block = getGroupBlock(groupOpenid) ?? { all: false, features: [] }
+    const welcomeGroups = Array.isArray(liveConfig.welcomeGroups) ? liveConfig.welcomeGroups : []
+    const verifyGroups = Array.isArray(liveConfig.joinVerifyGroups) ? liveConfig.joinVerifyGroups : []
+    const cleanupGroups = Array.isArray(liveConfig.inactiveCleanupGroups) ? liveConfig.inactiveCleanupGroups : []
+    return {
+      ...resolved.page,
+      features: GROUP_FEATURES,
+      blocks: { all: block.all === true, features: Array.isArray(block.features) ? block.features : [] },
+      pendingJoins: state.pendingJoins.filter((item) => item.groupOpenid === groupOpenid),
+      members: state.members.filter((item) => item.groupOpenid === groupOpenid).slice(-100),
+      managers: state.groupManagers.filter((item) => item.groupOpenid === groupOpenid),
+      announcements: state.announcements.filter((item) => Array.isArray(item.groupOpenids) && item.groupOpenids.includes(groupOpenid)),
+      welcome: {
+        enabled: liveConfig.welcomeEnabled === true && (welcomeGroups.length === 0 || welcomeGroups.includes(groupOpenid)),
+        text: liveConfig.welcomeText || '',
+        joinNotice: liveConfig.joinNoticeEnabled !== false,
+      },
+      joinVerify: {
+        enabled: liveConfig.joinVerifyEnabled === true && verifyGroups.includes(groupOpenid),
+        globalEnabled: liveConfig.joinVerifyEnabled === true,
+      },
+      cleanup: {
+        enabled: liveConfig.inactiveCleanupEnabled === true && cleanupGroups.includes(groupOpenid),
+        time: liveConfig.inactiveCleanupTime || '03:00',
+        days: Number(liveConfig.inactiveCleanupDays) || 30,
+      },
+    }
+  }
+
+  async function groupPageAction(token, action, body) {
+    const resolved = resolveGroupPage(token)
+    if (resolved.status !== 'ok') throw new Error(resolved.status === 'expired' ? '链接已过期' : '分群网页不存在')
+    const groupOpenid = resolved.page.group.openid
+    const name = resolved.page.group.name
+    const permissions = resolved.page.permissions
+    const need = /^join/.test(action)
+      ? 'joinApprove'
+      : /^(mute|unmute|kick)/.test(action)
+        ? 'memberManage'
+        : /^(say|generate|media)/.test(action)
+          ? 'say'
+          : 'settings'
+    if (permissions[need] !== true) {
+      const error = new Error('你无权限')
+      error.statusCode = 403
+      throw error
+    }
+    if (action === 'say' || action === 'generate') {
+      const text = action === 'say' ? String(body.text ?? '') : await composeLine(String(body.topic ?? ''))
+      if (text.trim().length === 0) throw new Error('消息不能为空')
+      const results = await sendTargets(`group:${groupOpenid}`, text, { kind: 'group-page' })
+      return { results }
+    }
+    if (action === 'media') {
+      const results = await sendMediaTargets(`group:${groupOpenid}`, {
+        type: body.type, url: body.url, data: body.data, fileName: body.fileName,
+      }, typeof body.caption === 'string' ? body.caption : '')
+      return { results }
+    }
+    if (action === 'join-approve') {
+      const memberOpenid = assertMemberOpenid(body.memberOpenid)
+      const pending = state.pendingJoins.find((item) => item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid)
+      if (!pending) throw new Error('没有这条待处理申请')
+      return handleGroupAdmin({
+        action: body.approve === true ? 'approve' : 'decline',
+        groupOpenid,
+        memberOpenid,
+        joinRequestId: pending.joinRequestId,
+        operator: '分群网页',
+      })
+    }
+    if (action === 'mute' || action === 'unmute' || action === 'kick') {
+      const memberOpenid = assertMemberOpenid(body.memberOpenid)
+      const groupPath = `/v2/groups/${encodeURIComponent(groupOpenid)}`
+      if (action === 'kick') {
+        await groupApi('POST', `${groupPath}/batch_remove_members`, { member_openids: [memberOpenid] })
+        return { ok: true }
+      }
+      const mute = action === 'mute'
+      const minutes = mute ? Math.max(1, Math.min(43200, Number(body.minutes) || 60)) : 0
+      await groupApi('POST', `${groupPath}/restrict_chat_setting`, {
+        members: [{
+          op: mute ? 'add' : 'del',
+          member_openid: memberOpenid,
+          mute_expire_at: mute ? new Date(Date.now() + minutes * 60_000).toISOString() : '',
+        }],
+      })
+      return { ok: true }
+    }
+    if (action === 'save-blocks') {
+      const features = Array.isArray(body.features) ? body.features : []
+      return handleGroupBlocks({ action: 'save', groupOpenid, all: body.all === true, features })
+    }
+    if (action === 'welcome-save') {
+      const current = Array.isArray(liveConfig.welcomeGroups) ? liveConfig.welcomeGroups : []
+      const groups = body.enabled === true
+        ? [...new Set([...current.filter((item) => item !== groupOpenid), groupOpenid])]
+        : current.filter((item) => item !== groupOpenid)
+      saveConfigPatch({
+        welcomeEnabled: body.enabled === true,
+        welcomeText: String(body.text ?? '').slice(0, 2000),
+        welcomeGroups: groups,
+      })
+      return { ok: true }
+    }
+    if (action === 'join-verify-save') {
+      const current = Array.isArray(liveConfig.joinVerifyGroups) ? liveConfig.joinVerifyGroups : []
+      const groups = body.enabled === true
+        ? [...new Set([...current, groupOpenid])]
+        : current.filter((item) => item !== groupOpenid)
+      saveConfigPatch({
+        joinVerifyEnabled: groups.length > 0,
+        joinVerifyGroups: groups,
+      })
+      return { ok: true }
+    }
+    if (action === 'manager-add' || action === 'manager-remove') {
+      const memberOpenid = assertMemberOpenid(body.memberOpenid)
+      if (action === 'manager-add') {
+        if (!isGroupDelegate(groupOpenid, memberOpenid)) {
+          state.groupManagers.push({
+            groupOpenid,
+            memberOpenid,
+            name: String(body.name ?? '').slice(0, 60),
+            addedBy: '分群网页',
+            addedAt: new Date().toISOString(),
+          })
+          persistState()
+        }
+      } else {
+        state.groupManagers = state.groupManagers.filter((item) => !(item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid))
+        persistState()
+      }
+      return { ok: true }
+    }
+    if (action === 'announcement-save') {
+      const time = String(body.time ?? '').trim()
+      if (!/^\d{2}:\d{2}$/.test(time)) throw new Error('时间格式应为 HH:MM')
+      const text = String(body.text ?? '').trim()
+      if (text.length === 0) throw new Error('公告内容不能为空')
+      const entry = {
+        id: `ann-${Date.now().toString(36)}`,
+        name: String(body.name ?? '群公告').slice(0, 60),
+        time,
+        date: /^\d{4}-\d{2}-\d{2}$/.test(String(body.date ?? '')) ? String(body.date) : '',
+        groupOpenids: [groupOpenid],
+        text: text.slice(0, 2000),
+        enabled: true,
+        imagePath: '',
+        createdAt: new Date().toISOString(),
+      }
+      state.announcements.push(entry)
+      persistState()
+      return { ok: true }
+    }
+    if (action === 'announcement-remove') {
+      state.announcements = state.announcements.filter((item) => item.id !== String(body.id ?? ''))
+      persistState()
+      return { ok: true }
+    }
+    if (action === 'announcement-run') {
+      return runAnnouncements(String(body.id ?? ''))
+    }
+    if (action === 'cleanup-save') {
+      const current = Array.isArray(liveConfig.inactiveCleanupGroups) ? liveConfig.inactiveCleanupGroups : []
+      const groups = body.enabled === true
+        ? [...new Set([...current, groupOpenid])]
+        : current.filter((item) => item !== groupOpenid)
+      saveConfigPatch({
+        inactiveCleanupEnabled: groups.length > 0,
+        inactiveCleanupGroups: groups,
+        inactiveCleanupTime: String(body.time ?? '03:00').slice(0, 5),
+        inactiveCleanupDays: Number(body.days) || 30,
+        inactiveCleanupMaxLevel: Number(body.maxLevel) || 1,
+      })
+      return { ok: true }
+    }
+    if (action === 'group-info') {
+      return { text: await groupInfoReply(groupOpenid) }
+    }
+    throw new Error('未知操作')
+  }
+
   function cancelPendingVerifications() {
     let count = 0
     for (const entry of [...state.joinVerifications]) {
