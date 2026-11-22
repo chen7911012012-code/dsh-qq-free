@@ -263,7 +263,7 @@ window.__ModuleLoader__.load({
       const [jvGroups, setJvGroups] = useState([])
       const [cleanupForm, setCleanupForm] = useState(null)
       const [gpForm, setGpForm] = useState({ groupOpenid: '', expiresAt: '', say: true, joinApprove: true, memberManage: true, settings: true })
-      const [checkinForm, setCheckinForm] = useState(null)
+      const [fortuneForm, setFortuneForm] = useState(null)
       const [mentionMember, setMentionMember] = useState('')
       const [mentionName, setMentionName] = useState('')
       const [welcomeForm, setWelcomeForm] = useState(null)
@@ -363,10 +363,10 @@ window.__ModuleLoader__.load({
             maxLevel: data.inactiveCleanup.maxLevel ?? 1,
           })
         }
-        if (checkinForm === null && data.checkin) {
-          setCheckinForm({
-            enabled: data.checkin.enabled === true,
-            groups: Array.isArray(data.checkin.groups) ? data.checkin.groups : [],
+        if (fortuneForm === null && data.fortune) {
+          setFortuneForm({
+            enabled: data.fortune.enabled === true,
+            groups: Array.isArray(data.fortune.groups) ? data.fortune.groups : [],
           })
         }
         if (githubForm === null && data.github) {          setGithubForm({
@@ -898,13 +898,13 @@ window.__ModuleLoader__.load({
         }
       }
 
-      async function saveCheckin() {
-        if (checkinForm === null) return
-        const result = await run('checkin', () => request('/qq-free/config', {
-          checkinEnabled: checkinForm.enabled,
-          checkinGroups: checkinForm.groups,
+      async function saveFortune() {
+        if (fortuneForm === null) return
+        const result = await run('fortune', () => request('/qq-free/config', {
+          fortuneEnabled: fortuneForm.enabled,
+          fortuneGroups: fortuneForm.groups,
         }))
-        if (result !== null) flash('ok', '签到设置已保存。')
+        if (result !== null) flash('ok', '今日运势设置已保存。')
       }
 
       async function runCleanup() {
@@ -2156,40 +2156,40 @@ window.__ModuleLoader__.load({
                 : h('p', { className: 'qqf-empty' }, '还没有分群网页。')),
 
             h(Card, {
-              title: '签到',
+              title: '今日运势',
               wide: true,
-              hint: '群成员发送「签到」或「打卡」即可每天签到一次，随机获得积分和今日运势；数据保存在本地。群聊不选表示全部群。',
+              hint: '群成员直接发送「今日运势」（无需 @机器人），每天一次，随机运势 + 二次元图片，0 点刷新；数据保存在本地。群聊不选表示全部群。',
             },
               h('label', { className: 'qqf-row' },
                 h('input', {
-                  type: 'checkbox', checked: checkinForm?.enabled === true,
-                  onChange: (event) => setCheckinForm({ ...checkinForm, enabled: event.target.checked }),
+                  type: 'checkbox', checked: fortuneForm?.enabled === true,
+                  onChange: (event) => setFortuneForm({ ...fortuneForm, enabled: event.target.checked }),
                 }),
-                h('span', null, '启用群签到')),
+                h('span', null, '启用今日运势')),
               groupTargets.length === 0
                 ? h('p', { className: 'qqf-empty' }, '先添加群聊目标。')
                 : h('div', { className: 'qqf-row' },
                   groupTargets.map((target) => h('label', { key: target.id, className: 'qqf-row' },
                     h('input', {
-                      type: 'checkbox', checked: checkinForm?.groups?.includes(target.openid) === true,
-                      onChange: (event) => setCheckinForm({
-                        ...checkinForm,
+                      type: 'checkbox', checked: fortuneForm?.groups?.includes(target.openid) === true,
+                      onChange: (event) => setFortuneForm({
+                        ...fortuneForm,
                         groups: event.target.checked
-                          ? [...new Set([...(checkinForm?.groups ?? []), target.openid])]
-                          : (checkinForm?.groups ?? []).filter((item) => item !== target.openid),
+                          ? [...new Set([...(fortuneForm?.groups ?? []), target.openid])]
+                          : (fortuneForm?.groups ?? []).filter((item) => item !== target.openid),
                       }),
                     }),
                     h('span', null, target.name)))),
-              h('button', { className: 'qqf-btn', disabled: busy !== '', onClick: () => void saveCheckin() },
-                busy === 'checkin' ? '保存中…' : '保存签到设置'),
-              data.checkins && data.checkins.length > 0
+              h('button', { className: 'qqf-btn', disabled: busy !== '', onClick: () => void saveFortune() },
+                busy === 'fortune' ? '保存中…' : '保存今日运势设置'),
+              data.fortunes && data.fortunes.length > 0
                 ? h('ul', { className: 'qqf-targets' },
-                  data.checkins.slice(0, 20).map((entry) => h('li', { key: `${entry.groupOpenid}-${entry.memberOpenid}`, className: 'qqf-target' },
+                  data.fortunes.slice(0, 20).map((entry) => h('li', { key: `${entry.groupOpenid}-${entry.memberOpenid}`, className: 'qqf-target' },
                     h('div', { className: 'qqf-target-main' },
-                      h('span', { className: 'qqf-target-name' }, `${entry.name || entry.memberOpenid} · ${entry.count} 次 · ${entry.points} 分`),
-                      h('span', { className: 'qqf-mono' }, `${groupTargets.find((target) => target.openid === entry.groupOpenid)?.name || entry.groupOpenid} · 最近 ${entry.lastDate}`),
-                      entry.lastFortune ? h('span', { className: 'qqf-mono' }, `今日运势：${entry.lastFortune}`) : null))))
-                : h('p', { className: 'qqf-empty' }, '还没有签到记录。')),
+                      h('span', { className: 'qqf-target-name' }, `${entry.name || entry.memberOpenid} · ${entry.date || ''}`),
+                      h('span', { className: 'qqf-mono' }, `${groupTargets.find((target) => target.openid === entry.groupOpenid)?.name || entry.groupOpenid}${entry.imagePath ? ' · 含图片' : ''}`),
+                      entry.fortune ? h('span', { className: 'qqf-mono' }, `今日运势：${entry.fortune}`) : null))))
+                : h('p', { className: 'qqf-empty' }, '还没有今日运势记录。')),
 
             h(Card, {
               title: '群功能屏蔽',
@@ -2217,7 +2217,7 @@ window.__ModuleLoader__.load({
                   ['joinNotice', '入群申请通知'],
                   ['joinRequest', '入群申请处理'],
                   ['joinVerify', '入群人机验证'],
-                  ['checkin', '群签到'],
+                  ['fortune', '今日运势'],
                   ['commands', '群管理命令'],
                   ['moderation', '违禁词'],
                   ['info', '获取信息'],
