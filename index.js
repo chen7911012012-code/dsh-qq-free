@@ -1248,6 +1248,7 @@ export async function apply(ctx, config) {
     const memberOpenid = String(data.member_openid ?? '')
     if (groupOpenid.length === 0 || memberOpenid.length === 0) return
     if (!verifyGroupEnabled(groupOpenid)) return
+    if (isGroupFeatureBlocked(groupOpenid, 'joinVerify')) return
     const role = String(data.member_role ?? '')
     if (role === 'admin' || role === 'owner' || isOwnerMember(memberOpenid) || isGroupDelegate(groupOpenid, memberOpenid)) return
     const key = verificationKey(groupOpenid, memberOpenid)
@@ -1304,6 +1305,7 @@ export async function apply(ctx, config) {
     const memberOpenid = String(data.author?.member_openid ?? '')
     if (groupOpenid.length === 0 || memberOpenid.length === 0) return null
     if (!verifyGroupEnabled(groupOpenid)) return null
+    if (isGroupFeatureBlocked(groupOpenid, 'joinVerify')) return null
     const entry = state.joinVerifications.find((item) => item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid)
     if (!entry) return null
     if (Date.now() > Number(entry.expiresAt)) {
@@ -1633,6 +1635,14 @@ export async function apply(ctx, config) {
         existing.updatedAt = new Date().toISOString()
       } else {
         state.groupBlocks.push({ groupOpenid, all, features, updatedAt: new Date().toISOString() })
+      }
+      if (features.includes('joinVerify')) {
+        for (const entry of [...state.joinVerifications].filter((item) => item.groupOpenid === groupOpenid)) {
+          clearVerification(entry)
+        }
+      }
+      if (features.includes('joinRequest')) {
+        state.pendingJoins = state.pendingJoins.filter((item) => item.groupOpenid !== groupOpenid)
       }
       persistState()
       return { saved: true, groupOpenid, all, features }
