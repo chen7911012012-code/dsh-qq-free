@@ -341,6 +341,8 @@ export async function apply(ctx, config) {
   state.joinVerifications = Array.isArray(state.joinVerifications)
     ? state.joinVerifications.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.memberOpenid === 'string').slice(-200)
     : []
+  state.memberActivity = state.memberActivity !== null && typeof state.memberActivity === 'object' ? state.memberActivity : {}
+  state.cleanupSlots = state.cleanupSlots !== null && typeof state.cleanupSlots === 'object' ? state.cleanupSlots : {}
 
   // 只保留今天的配额计数
   const today = todayKey()
@@ -366,6 +368,53 @@ export async function apply(ctx, config) {
 
   let membersPersistTimer = null
   /** 记录最近在群里说过话的成员，供自由发言选择 @ 成员。 */
+  let inactivityPersistTimer = null
+
+  function recordMemberActivity({ groupOpenid, memberOpenid, username }) {
+    if (typeof groupOpenid !== 'string' || groupOpenid.length === 0) return
+    if (typeof memberOpenid !== 'string' || memberOpenid.length === 0) return
+    const key = `${groupOpenid}:${memberOpenid}`
+    const previous = state.memberActivity[key]
+    state.memberActivity[key] = {
+      groupOpenid,
+      memberOpenid,
+      name: String(username || previous?.name || '').slice(0, 80),
+      lastAt: new Date().toISOString(),
+      count: (Number(previous?.count) || 0) + 1,
+    }
+    const keys = Object.keys(state.memberActivity)
+    if (keys.length > 2000) {
+      for (const oldKey of keys.slice(0, keys.length - 2000)) delete state.memberActivity[oldKey]
+    }
+    if (inactivityPersistTimer === null) {
+      inactivityPersistTimer = setTimeout(() => {
+        inactivityPersistTimer = null
+        persistState()
+      }, 10_000)
+      inactivityPersistTimer.unref?.()
+    }
+  }
+
+  function captureTestGroupOwner(data) {
+    const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
+    const memberOpenid = String(data.author?.member_openid ?? '')
+    const role = String(data.author?.member_role ?? '')
+    if (role !== 'owner' || memberOpenid.length === 0) return
+    const target = findTarget(groupOpenid)
+    if (!target || !String(target.name || '').includes('机器人测试')) return
+    if (liveConfig.ownerOpenid === memberOpenid) return
+    saveConfigPatch({ ownerOpenid: memberOpenid })
+    appendLog({
+      at: new Date().toISOString(),
+      scope: 'group',
+      openid: groupOpenid,
+      name: target.name || '机器人测试群',
+      text: `自动把群主 ${memberOpenid} 设为主人`,
+      ok: true,
+      kind: 'owner',
+    })
+  }
+
   function rememberMember({ groupOpenid, memberOpenid, username, memberRole }) {
     if (typeof groupOpenid !== 'string' || groupOpenid.length === 0) return
     if (typeof memberOpenid !== 'string' || memberOpenid.length === 0) return
@@ -1343,6 +1392,7 @@ export async function apply(ctx, config) {
   }
 
   async function handleGroupCommand(data) {
+    captureTestGroupOwner(data)
     const role = String(data.author?.member_role ?? '')
     const memberOpenid = String(data.author?.member_openid ?? '')
     const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
@@ -2567,6 +2617,14 @@ export async function apply(ctx, config) {
       joinVerify: {
         enabled: liveConfig.joinVerifyEnabled === true,
         groups: Array.isArray(liveConfig.joinVerifyGroups) ? liveConfig.joinVerifyGroups : [],
+      },
+      inactiveCleanup: {
+        enabled: liveConfig.inactiveCleanupEnabled === true,
+        groups: Array.isArray(liveConfig.inactiveCleanupGroups) ? liveConfig.inactiveCleanupGroups : [],
+        time: liveConfig.inactiveCleanupTime || '03:00',
+        days: Number(liveConfig.inactiveCleanupDays) || 30,
+        maxLevel: Number(liveConfig.inactiveCleanupMaxLevel) || 1,
+        lastResult: state.lastCleanup || null,
       },
       ownerOpenid: liveConfig.ownerOpenid || '',
       boards: state.boards.map((board) => ({
