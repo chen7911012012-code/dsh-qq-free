@@ -1406,6 +1406,34 @@ export async function apply(ctx, config) {
     return members
   }
 
+  function localMemberRoster(groupOpenid) {
+    const roster = new Map()
+    for (const member of state.members) {
+      if (member.groupOpenid !== groupOpenid) continue
+      roster.set(member.openid, {
+        member_openid: member.openid,
+        username: member.name,
+        member_role: member.role,
+        joined_at: member.at,
+        local_last_at: member.at,
+        local_count: 0,
+      })
+    }
+    for (const [key, activity] of Object.entries(state.memberActivity)) {
+      if (!key.startsWith(`${groupOpenid}:`)) continue
+      const existing = roster.get(activity.memberOpenid) ?? {
+        member_openid: activity.memberOpenid,
+        username: activity.name,
+        member_role: 'member',
+      }
+      existing.username = activity.name || existing.username
+      existing.local_last_at = activity.lastAt
+      existing.local_count = Number(activity.count) || 0
+      roster.set(activity.memberOpenid, existing)
+    }
+    return [...roster.values()]
+  }
+
   async function runInactiveCleanup(force = false) {
     if (cleanupBusy) return { skipped: true }
     if (!force && liveConfig.inactiveCleanupEnabled !== true) return { skipped: true }
