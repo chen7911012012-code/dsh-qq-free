@@ -3109,15 +3109,6 @@ export async function apply(ctx, config) {
       addedAt: new Date().toISOString(),
     }
     state.targets.push(created)
-    if (target.scope === 'group' && !state.groupBlocks.some((item) => item.groupOpenid === target.openid)) {
-      state.groupBlocks.push({
-        groupOpenid: target.openid,
-        all: true,
-        features: [],
-        updatedAt: new Date().toISOString(),
-        defaultBlocked: true,
-      })
-    }
     persistState()
     return created
   }
