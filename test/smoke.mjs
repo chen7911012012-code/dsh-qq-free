@@ -359,6 +359,11 @@ if (ws) {
   await sleep(150)
   check('屏蔽其他机器人和 @所有人 消息', sent.length === beforeBot)
 
+  const beforeOtherBot = sent.length
+  ws.emit({ op: 0, s: 8, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-OTHERBOT', content: '<@OTHERBOT> 你好', group_openid: GROUP, mentions: [{ member_openid: 'OTHERBOT1', bot: true, is_you: false }], author: { member_openid: 'NORMALUSER1', member_role: 'member' } } })
+  await sleep(150)
+  check('@其他机器人不回复', sent.length === beforeOtherBot)
+
   result = await call('/qq-free/config', 'POST', { welcomeEnabled: true, welcomeText: '欢迎 {member_openid}', welcomeGroups: [GROUP] })
   check('保存入群欢迎', result.status === 200 && result.body.state.welcome.enabled === true)
   const beforeWelcome = sent.length
