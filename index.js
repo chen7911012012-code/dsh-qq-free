@@ -518,8 +518,17 @@ export async function apply(ctx, config) {
       if (groupName && (!existing.name || existing.name.startsWith('QQ 群 '))) {
         existing.name = String(groupName).slice(0, 60)
         existing.nameResolved = true
-        persistState()
       }
+      if (defaultBlock === true && !state.groupBlocks.some((item) => item.groupOpenid === openid)) {
+        state.groupBlocks.push({
+          groupOpenid: openid,
+          all: true,
+          features: [],
+          updatedAt: new Date().toISOString(),
+          defaultBlocked: true,
+        })
+      }
+      persistState()
       return
     }
     const target = {
