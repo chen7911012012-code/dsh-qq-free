@@ -2575,13 +2575,13 @@ export async function apply(ctx, config) {
         time: liveConfig.inactiveCleanupTime || '03:00',
         days: Number(liveConfig.inactiveCleanupDays) || 30,
       },
-      checkin: {
-        enabled: liveConfig.checkinEnabled === true
-          && ((Array.isArray(liveConfig.checkinGroups) ? liveConfig.checkinGroups : []).length === 0
-            || (Array.isArray(liveConfig.checkinGroups) ? liveConfig.checkinGroups : []).includes(groupOpenid)),
-        leaderboard: Object.values(state.checkins)
+      fortune: {
+        enabled: liveConfig.fortuneEnabled === true
+          && ((Array.isArray(liveConfig.fortuneGroups) ? liveConfig.fortuneGroups : []).length === 0
+            || (Array.isArray(liveConfig.fortuneGroups) ? liveConfig.fortuneGroups : []).includes(groupOpenid)),
+        records: Object.values(state.fortunes)
           .filter((item) => item && item.groupOpenid === groupOpenid)
-          .sort((left, right) => (Number(right.count) || 0) - (Number(left.count) || 0) || (Number(right.points) || 0) - (Number(left.points) || 0))
+          .sort((left, right) => String(right.date ?? '').localeCompare(String(left.date ?? '')))
           .slice(0, 50),
       },
     }
@@ -2728,16 +2728,16 @@ export async function apply(ctx, config) {
     if (action === 'announcement-run') {
       return runAnnouncements(String(body.id ?? ''))
     }
-    if (action === 'checkin-save') {
-      const configured = Array.isArray(liveConfig.checkinGroups) ? liveConfig.checkinGroups : []
+    if (action === 'fortune-save') {
+      const configured = Array.isArray(liveConfig.fortuneGroups) ? liveConfig.fortuneGroups : []
       const allGroups = state.targets.filter((item) => item.scope === 'group').map((item) => item.openid)
       const current = configured.length > 0 ? configured : allGroups
       const groups = body.enabled === true
         ? [...new Set([...current, groupOpenid])]
         : current.filter((item) => item !== groupOpenid)
       saveConfigPatch({
-        checkinEnabled: body.enabled === true || groups.length > 0,
-        checkinGroups: groups,
+        fortuneEnabled: body.enabled === true || groups.length > 0,
+        fortuneGroups: groups,
       })
       return { ok: true }
     }
