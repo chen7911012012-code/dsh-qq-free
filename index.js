@@ -1320,7 +1320,18 @@ export async function apply(ctx, config) {
     return groups.includes(groupOpenid)
   }
 
-  async function startJoinVerification(data) {
+  async function isGroupAllMuted(groupOpenid) {
+    try {
+      const data = await groupApi('GET', `/v2/groups/${encodeURIComponent(groupOpenid)}/restrict_chat_setting`)
+      const mode = String(data?.global_rule?.mode ?? 'none')
+      return mode.length > 0 && mode !== 'none'
+    } catch {
+      // 查不到禁言状态时按未禁言处理，避免把新成员一直挂着
+      return false
+    }
+  }
+
+  async function startJoinVerification(data, options = {}) {
     const groupOpenid = String(data.group_openid ?? '')
     const memberOpenid = String(data.member_openid ?? '')
     if (groupOpenid.length === 0 || memberOpenid.length === 0) return
@@ -1328,6 +1339,26 @@ export async function apply(ctx, config) {
     if (isGroupFeatureBlocked(groupOpenid, 'joinVerify')) return
     const role = String(data.member_role ?? '')
     if (role === 'admin' || role === 'owner' || isOwnerMember(memberOpenid) || isGroupDelegate(groupOpenid, memberOpenid)) return
+    const name = String(data.username ?? data.member_nickname ?? '新成员')
+    if (options.skipMuteCheck !== true && await isGroupAllMuted(groupOpenid)) {
+      state.joinVerifications = state.joinVerifications.filter((item) => item.groupOpenid !== groupOpenid || item.memberOpenid !== memberOpenid)
+      state.joinVerifications.push({
+        groupOpenid,
+        memberOpenid,
+        name,
+        deferred: true,
+        createdAt: new Date().toISOString(),
+      })
+      persistState()
+      try {
+        await sendText({ scope: 'group', openid: groupOpenid, name: '入群验证' },
+          '检测到禁言，验证将会在下一次发送消息时进行验证。',
+          { kind: 'join-verify', ignoreDailyLimit: true })
+      } catch (error) {
+        logger.warn(`qq-free: 发送禁言提示失败 ${error instanceof Error ? error.message : String(error)}`)
+      }
+      return
+    }
     const key = verificationKey(groupOpenid, memberOpenid)
     const old = state.joinVerifications.find((item) => item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid)
     if (old) {
@@ -1336,7 +1367,7 @@ export async function apply(ctx, config) {
       verificationTimers.delete(key)
     }
     const code = String(Math.floor(100000 + Math.random() * 900000))
-    const name = String(data.username ?? data.member_nickname ?? '新成员')
+    const minutes = Number(options.minutes) || 2
     const dir = join(DATA_DIR, 'verifications')
     mkdirSync(dir, { recursive: true })
     const imagePath = join(dir, `${groupOpenid}-${memberOpenid}.png`)
