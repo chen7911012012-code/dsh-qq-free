@@ -1308,7 +1308,7 @@ export async function apply(ctx, config) {
     if (existing !== undefined) clearTimeout(existing)
     const delay = Math.max(0, Number(entry.expiresAt) - Date.now())
     const timer = setTimeout(() => {
-      void kickUnverified(entry, `${entry.name || entry.memberOpenid} 未在 2 分钟内完成验证，已被移出群聊。`)
+      void kickUnverified(entry, `${entry.name || entry.memberOpenid} 未在 ${Number(entry.minutes) || 2} 分钟内完成验证，已被移出群聊。`)
     }, delay)
     timer.unref?.()
     verificationTimers.set(key, timer)
@@ -1382,7 +1382,8 @@ export async function apply(ctx, config) {
       name,
       code,
       imagePath,
-      expiresAt: Date.now() + 120_000,
+      minutes,
+      expiresAt: Date.now() + minutes * 60_000,
     }
     state.joinVerifications = state.joinVerifications.filter((item) => item.groupOpenid !== groupOpenid || item.memberOpenid !== memberOpenid)
     state.joinVerifications.push(entry)
@@ -1391,7 +1392,7 @@ export async function apply(ctx, config) {
     const target = { scope: 'group', openid: groupOpenid, name: '入群验证' }
     try {
       await sendText(target,
-        `欢迎 ${name} 加入本群！请在 2 分钟内 @机器人 回复图片中的 6 位验证码。超时或回复错误会被移出群聊。`,
+        `欢迎 ${name} 加入本群！请在 ${minutes} 分钟内 @机器人 回复图片中的 6 位验证码。超时或回复错误会被移出群聊。`,
         { mention: memberOpenid, kind: 'join-verify', ignoreDailyLimit: true })
       if (entry.imagePath && existsSync(entry.imagePath)) {
         await sendMedia(target, { type: 1, path: entry.imagePath, kind: 'join-verify', ignoreDailyLimit: true })
@@ -2877,7 +2878,7 @@ export async function apply(ctx, config) {
   ctx.effect(() => {
     for (const entry of [...state.joinVerifications]) {
       if (Date.now() > Number(entry.expiresAt)) {
-        void kickUnverified(entry, `${entry.name || entry.memberOpenid} 未在 2 分钟内完成验证，已被移出群聊。`)
+        void kickUnverified(entry, `${entry.name || entry.memberOpenid} 未在 ${Number(entry.minutes) || 2} 分钟内完成验证，已被移出群聊。`)
       } else {
         scheduleVerification(entry)
       }
