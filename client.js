@@ -263,6 +263,7 @@ window.__ModuleLoader__.load({
       const [jvGroups, setJvGroups] = useState([])
       const [cleanupForm, setCleanupForm] = useState(null)
       const [gpForm, setGpForm] = useState({ groupOpenid: '', expiresAt: '', say: true, joinApprove: true, memberManage: true, settings: true })
+      const [checkinForm, setCheckinForm] = useState(null)
       const [mentionMember, setMentionMember] = useState('')
       const [mentionName, setMentionName] = useState('')
       const [welcomeForm, setWelcomeForm] = useState(null)
@@ -360,6 +361,12 @@ window.__ModuleLoader__.load({
             time: data.inactiveCleanup.time || '03:00',
             days: data.inactiveCleanup.days || 30,
             maxLevel: data.inactiveCleanup.maxLevel ?? 1,
+          })
+        }
+        if (checkinForm === null && data.checkin) {
+          setCheckinForm({
+            enabled: data.checkin.enabled === true,
+            groups: Array.isArray(data.checkin.groups) ? data.checkin.groups : [],
           })
         }
         if (githubForm === null && data.github) {          setGithubForm({
@@ -889,6 +896,15 @@ window.__ModuleLoader__.load({
         } catch {
           flash('error', '复制失败，请手动复制。')
         }
+      }
+
+      async function saveCheckin() {
+        if (checkinForm === null) return
+        const result = await run('checkin', () => request('/qq-free/config', {
+          checkinEnabled: checkinForm.enabled,
+          checkinGroups: checkinForm.groups,
+        }))
+        if (result !== null) flash('ok', '签到设置已保存。')
       }
 
       async function runCleanup() {
@@ -2138,6 +2154,42 @@ window.__ModuleLoader__.load({
                         }, '删除')))
                   }))
                 : h('p', { className: 'qqf-empty' }, '还没有分群网页。')),
+
+            h(Card, {
+              title: '签到',
+              wide: true,
+              hint: '群成员发送「签到」或「打卡」即可每天签到一次，随机获得积分和今日运势；数据保存在本地。群聊不选表示全部群。',
+            },
+              h('label', { className: 'qqf-row' },
+                h('input', {
+                  type: 'checkbox', checked: checkinForm?.enabled === true,
+                  onChange: (event) => setCheckinForm({ ...checkinForm, enabled: event.target.checked }),
+                }),
+                h('span', null, '启用群签到')),
+              groupTargets.length === 0
+                ? h('p', { className: 'qqf-empty' }, '先添加群聊目标。')
+                : h('div', { className: 'qqf-row' },
+                  groupTargets.map((target) => h('label', { key: target.id, className: 'qqf-row' },
+                    h('input', {
+                      type: 'checkbox', checked: checkinForm?.groups?.includes(target.openid) === true,
+                      onChange: (event) => setCheckinForm({
+                        ...checkinForm,
+                        groups: event.target.checked
+                          ? [...new Set([...(checkinForm?.groups ?? []), target.openid])]
+                          : (checkinForm?.groups ?? []).filter((item) => item !== target.openid),
+                      }),
+                    }),
+                    h('span', null, target.name)))),
+              h('button', { className: 'qqf-btn', disabled: busy !== '', onClick: () => void saveCheckin() },
+                busy === 'checkin' ? '保存中…' : '保存签到设置'),
+              data.checkins && data.checkins.length > 0
+                ? h('ul', { className: 'qqf-targets' },
+                  data.checkins.slice(0, 20).map((entry) => h('li', { key: `${entry.groupOpenid}-${entry.memberOpenid}`, className: 'qqf-target' },
+                    h('div', { className: 'qqf-target-main' },
+                      h('span', { className: 'qqf-target-name' }, `${entry.name || entry.memberOpenid} · ${entry.count} 次 · ${entry.points} 分`),
+                      h('span', { className: 'qqf-mono' }, `${groupTargets.find((target) => target.openid === entry.groupOpenid)?.name || entry.groupOpenid} · 最近 ${entry.lastDate}`),
+                      entry.lastFortune ? h('span', { className: 'qqf-mono' }, `今日运势：${entry.lastFortune}`) : null))))
+                : h('p', { className: 'qqf-empty' }, '还没有签到记录。')),
 
             h(Card, {
               title: '群功能屏蔽',
