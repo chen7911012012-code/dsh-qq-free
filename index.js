@@ -532,8 +532,17 @@ export async function apply(ctx, config) {
       addedAt: new Date().toISOString(),
     }
     state.targets.push(target)
+    if (!state.groupBlocks.some((item) => item.groupOpenid === openid)) {
+      state.groupBlocks.push({
+        groupOpenid: openid,
+        all: true,
+        features: [],
+        updatedAt: new Date().toISOString(),
+        defaultBlocked: true,
+      })
+    }
     persistState()
-    logger.info(`qq-free: 自动发现新群 ${openid}`)
+    logger.info(`qq-free: 自动发现新群 ${openid}，默认屏蔽全部功能`)
     if (!liveConfig.defaultTarget) saveConfigPatch({ defaultTarget: target.id })
     if (!target.nameResolved) void fillGroupName(openid, target)
   }
@@ -1159,7 +1168,7 @@ export async function apply(ctx, config) {
     }
     if (entry.riskTips) lines.push(`提示：${entry.riskTips}`)
     if (!avatarIncluded && entry.avatar) lines.push(`头像：${entry.avatar}`)
-    lines.push(`管理员在群里回复「同意 ${name}」或「拒绝 ${name}」处理；也可到 DSH 面板操作。`)
+    lines.push(`管理员在群里回复「同意 ${name}」或「拒绝 ${name}」处理。`)
     return lines.join('\n')
   }
 
@@ -3100,6 +3109,15 @@ export async function apply(ctx, config) {
       addedAt: new Date().toISOString(),
     }
     state.targets.push(created)
+    if (target.scope === 'group' && !state.groupBlocks.some((item) => item.groupOpenid === target.openid)) {
+      state.groupBlocks.push({
+        groupOpenid: target.openid,
+        all: true,
+        features: [],
+        updatedAt: new Date().toISOString(),
+        defaultBlocked: true,
+      })
+    }
     persistState()
     return created
   }
