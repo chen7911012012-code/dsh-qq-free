@@ -1630,10 +1630,6 @@ export async function apply(ctx, config) {
     const targetOpenid = String(targetMention?.member_openid ?? '')
     const targetName = String(targetMention?.username ?? targetMention?.member_nickname ?? '')
 
-    // 签到对所有群成员开放，不受管理员权限限制
-    const checkinReply = handleCheckin(data)
-    if (checkinReply !== null) return checkinReply
-
     // 代管管理：只有主人、群主、群管理员可以添加/取消
     if (/^(添加代管|取消代管)$/.test(text)) {
       if (!canConfigureManagers(memberOpenid, role)) return '只有主人、群主或群管理员可以管理代管。'
@@ -2297,6 +2293,7 @@ export async function apply(ctx, config) {
     onGroupAllBlocked: (groupOpenid) => isGroupAllBlocked(groupOpenid),
     onGroupFeatureBlocked: (groupOpenid, feature) => isGroupFeatureBlocked(groupOpenid, feature),
     onInfoCommand: (data) => handleMemberInfo(data),
+    onFortune: (data) => handleFortune(data),
     onMemberActivity: (data) => recordMemberActivity(data),
     onVerifyCode: (data) => handleVerifyCode(data),
     logger,
