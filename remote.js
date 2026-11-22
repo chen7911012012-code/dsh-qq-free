@@ -131,7 +131,12 @@ export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMe
         json(res, 400, { ok: false, error: '消息不能为空' })
         return
       }
-      const results = await groupPage.say(token, text)
+      const results = await groupPage.say(token, text).catch((error) => {
+        logger.warn(`qq-free remote: 分群发言失败 ${error instanceof Error ? error.message : String(error)}`)
+        json(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
+        return null
+      })
+      if (results === null) return
       json(res, 200, { ok: true, results })
       return
     }
