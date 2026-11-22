@@ -510,7 +510,7 @@ export async function apply(ctx, config) {
   }
 
   /** 收到新群事件时自动把群加进会话目标，面板下一次轮询就能看到。 */
-  function rememberGroupTarget({ groupOpenid, groupName }) {
+  function rememberGroupTarget({ groupOpenid, groupName, defaultBlock }) {
     const openid = String(groupOpenid ?? '').trim()
     if (!/^[A-Za-z0-9_-]{8,}$/.test(openid)) return
     const existing = state.targets.find((target) => target.scope === 'group' && target.openid === openid)
@@ -532,7 +532,7 @@ export async function apply(ctx, config) {
       addedAt: new Date().toISOString(),
     }
     state.targets.push(target)
-    if (!state.groupBlocks.some((item) => item.groupOpenid === openid)) {
+    if (defaultBlock === true && !state.groupBlocks.some((item) => item.groupOpenid === openid)) {
       state.groupBlocks.push({
         groupOpenid: openid,
         all: true,
@@ -542,7 +542,7 @@ export async function apply(ctx, config) {
       })
     }
     persistState()
-    logger.info(`qq-free: 自动发现新群 ${openid}，默认屏蔽全部功能`)
+    logger.info(`qq-free: 自动发现新群 ${openid}${defaultBlock === true ? '，默认屏蔽全部功能' : ''}`)
     if (!liveConfig.defaultTarget) saveConfigPatch({ defaultTarget: target.id })
     if (!target.nameResolved) void fillGroupName(openid, target)
   }
