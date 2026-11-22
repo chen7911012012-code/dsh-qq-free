@@ -1958,6 +1958,11 @@ export async function apply(ctx, config) {
     const text = String(data.content ?? '').replace(/<@!?[^>]+>/g, '').replace(/\s+/g, ' ').trim()
     if (!/^获取信息$/.test(text)) return null
     if (isGroupFeatureBlocked(groupOpenid, 'info')) return null
+    const role = String(data.author?.member_role ?? '')
+    const askerOpenid = String(data.author?.member_openid ?? '')
+    if (role !== 'admin' && role !== 'owner' && !isOwnerMember(askerOpenid)) {
+      return '只有群主、管理员或主人可以获取成员信息。'
+    }
     const mentions = Array.isArray(data.mentions) ? data.mentions : []
     const target = mentions.find((mention) => mention && mention.is_you !== true && mention.member_openid)
     if (!target) return null
