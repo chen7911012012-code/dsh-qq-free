@@ -3387,7 +3387,6 @@ export async function apply(ctx, config) {
           messageId: results[0]?.messageId ?? '',
           target: results[0]?.target ?? null,
           results,
-          state: snapshot(),
         })
       }),
     }))
@@ -3408,7 +3407,6 @@ export async function apply(ctx, config) {
           ok: true,
           messageId: results[0]?.messageId ?? '',
           results,
-          state: snapshot(),
         })
       }),
     }))
@@ -3429,7 +3427,6 @@ export async function apply(ctx, config) {
             sent: true,
             target: results[0]?.target ?? null,
             results,
-            state: snapshot(),
           })
           return
         }
