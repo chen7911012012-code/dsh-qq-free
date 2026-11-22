@@ -48,6 +48,8 @@
         ownerOpenid: ''
         joinVerifyEnabled: false
         joinVerifyGroups: []
+        checkinEnabled: true
+        checkinGroups: []
         inactiveCleanupEnabled: false
         inactiveCleanupGroups: []
         inactiveCleanupTime: '03:00'
