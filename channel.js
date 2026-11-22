@@ -325,6 +325,13 @@ export function createChatChannel(deps) {
     return mentions.some((mention) => mention && mention.is_you === true)
   }
 
+  function isOpenModerationCommand(data) {
+    const text = String(data?.content ?? '').replace(/<@!?[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    if (!/^(禁|解|踢|飞)$/.test(text)) return false
+    const mentions = Array.isArray(data?.mentions) ? data.mentions : []
+    return mentions.some((mention) => mention && mention.is_you !== true && mention.member_openid)
+  }
+
   async function handleDispatch(type, data) {
     if (data === null || typeof data !== 'object') return
     if (type === 'GROUP_ADD_ROBOT') {
@@ -504,8 +511,9 @@ export function createChatChannel(deps) {
       }
     }
 
-    // 群全量消息里，只有 @ 当前机器人的消息才继续处理命令/问答；@ 其他机器人不响应
-    if (scope === 'group' && type === 'GROUP_MESSAGE_CREATE' && !mentionsBot(data)) return
+    // 群全量消息里，默认必须 @ 当前机器人；禁/解/踢 三个快捷指令允许不 @
+    if (scope === 'group' && type === 'GROUP_MESSAGE_CREATE'
+      && !mentionsBot(data) && !isOpenModerationCommand(data)) return
 
     // 群里管理员用「同意 / 拒绝 <申请号>」处理入群申请：走被动回复，不耗主动消息
     if (scope === 'group' && typeof onGroupCommand === 'function'
