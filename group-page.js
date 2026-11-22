@@ -77,7 +77,13 @@ section{display:none}section.on{display:block}
   </section>
   <section id="tab-settings">
     <div class="card">
-      <h2>群功能开关</h2>
+      <h2>AI 聊天与自主发言</h2>
+      <label class="check"><input type="checkbox" id="aiChatOn"> AI 聊天（@机器人问答 / 闲聊）</label>
+      <label class="check" style="margin-top:8px"><input type="checkbox" id="autoOn"> 自主发言（主动插话）</label>
+      <div class="row" style="margin-top:10px"><button id="aiChatSave">保存聊天开关</button></div>
+    </div>
+    <div class="card">
+      <h2>其他群功能开关</h2>
       <div class="grid" id="featureGrid"></div>
       <div class="row" style="margin-top:10px"><button id="blockBtn">保存功能开关</button></div>
       <p class="muted">关闭「入群申请处理」后，本群不再记录/通知入群申请；关闭「入群人机验证」后，本群新成员不验证。</p>
@@ -165,7 +171,8 @@ $('tabs').addEventListener('click', (event) => {
   for (const item of document.querySelectorAll('#tabs button')) item.classList.toggle('on', item === button);
   for (const section of document.querySelectorAll('section')) section.classList.toggle('on', section.id === 'tab-' + button.dataset.tab);
 });
-const FEATURE_LABELS = { chat:'群聊回复', auto:'自动发言', welcome:'入群欢迎', joinNotice:'入群申请通知', joinRequest:'入群申请处理', joinVerify:'入群人机验证', commands:'群管理命令', moderation:'违禁词', info:'获取信息' };
+const FEATURE_LABELS = { auto:'自主发言', welcome:'入群欢迎', joinNotice:'入群申请通知', joinRequest:'入群申请处理', joinVerify:'入群人机验证', commands:'群管理命令', moderation:'违禁词', info:'获取信息' };
+const CHAT_FEATURES = ['chat', 'auto'];
 function render() {
   $('groupName').textContent = data.group.name || '分群管理';
   $('meta').textContent = (data.expiresAt ? ('有效期至 ' + new Date(data.expiresAt).toLocaleString('zh-CN', { hour12:false })) : '长期有效');
@@ -179,7 +186,9 @@ function render() {
   const members = data.members || [];
   $('memberList').innerHTML = members.map((item) => '<li class="item"><div><div>' + (item.name || item.openid) + '</div><div class="muted">' + item.openid + ' · ' + (item.role || 'member') + '</div></div><div class="row"><button class="sm" data-mute="' + item.openid + '">禁言60分</button><button class="sm ghost" data-unmute="' + item.openid + '">解禁</button><button class="sm danger" data-kick="' + item.openid + '">踢人</button></div></li>').join('');
   $('memberEmpty').style.display = members.length ? 'none' : 'block';
-  $('featureGrid').innerHTML = (data.features || []).map((key) => '<label class="check"><input type="checkbox" data-feature="' + key + '" ' + ((data.blocks?.features || []).includes(key) ? '' : 'checked') + '> ' + (FEATURE_LABELS[key] || key) + '</label>').join('') + '<label class="check"><input type="checkbox" data-feature="__all" ' + (data.blocks?.all ? 'checked' : '') + '> 全部屏蔽</label>';
+  $('featureGrid').innerHTML = (data.features || []).filter((key) => !CHAT_FEATURES.includes(key)).map((key) => '<label class="check"><input type="checkbox" data-feature="' + key + '" ' + ((data.blocks?.features || []).includes(key) ? '' : 'checked') + '> ' + (FEATURE_LABELS[key] || key) + '</label>').join('') + '<label class="check"><input type="checkbox" data-feature="__all" ' + (data.blocks?.all ? 'checked' : '') + '> 全部屏蔽</label>';
+  $('aiChatOn').checked = data.blocks?.all !== true && !(data.blocks?.features || []).includes('chat');
+  $('autoOn').checked = data.blocks?.all !== true && !(data.blocks?.features || []).includes('auto');
   $('welcomeOn').checked = data.welcome?.enabled === true;
   $('welcomeText').value = data.welcome?.text || '';
   $('verifyOn').checked = data.joinVerify?.enabled === true;
@@ -218,8 +227,18 @@ $('memberList').onclick = (event) => {
 };
 $('blockBtn').onclick = () => {
   const all = $('featureGrid').querySelector('[data-feature="__all"]').checked;
-  const blocked = [...$('featureGrid').querySelectorAll('input[data-feature]:not([data-feature="__all"])')].filter((input) => !input.checked).map((input) => input.dataset.feature);
-  act('save-blocks', { all, features: blocked });
+  const blocked = new Set(data.blocks?.features || []);
+  for (const input of $('featureGrid').querySelectorAll('input[data-feature]:not([data-feature="__all"])')) {
+    if (input.checked) blocked.delete(input.dataset.feature);
+    else blocked.add(input.dataset.feature);
+  }
+  act('save-blocks', { all, features: [...blocked] });
+};
+$('aiChatSave').onclick = () => {
+  const blocked = new Set(data.blocks?.features || []);
+  if ($('aiChatOn').checked) blocked.delete('chat'); else blocked.add('chat');
+  if ($('autoOn').checked) blocked.delete('auto'); else blocked.add('auto');
+  act('save-blocks', { all: false, features: [...blocked] });
 };
 $('welcomeBtn').onclick = () => act('welcome-save', { enabled: $('welcomeOn').checked, text: $('welcomeText').value });
 $('verifyBtn').onclick = () => act('join-verify-save', { enabled: $('verifyOn').checked });
