@@ -343,6 +343,9 @@ export async function apply(ctx, config) {
     : []
   state.memberActivity = state.memberActivity !== null && typeof state.memberActivity === 'object' ? state.memberActivity : {}
   state.cleanupSlots = state.cleanupSlots !== null && typeof state.cleanupSlots === 'object' ? state.cleanupSlots : {}
+  state.groupPages = Array.isArray(state.groupPages)
+    ? state.groupPages.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.token === 'string').slice(-100)
+    : []
 
   // 只保留今天的配额计数
   const today = todayKey()
@@ -2375,6 +2378,78 @@ export async function apply(ctx, config) {
     },
   }
 
+  function findGroupPage(token) {
+    const value = String(token ?? '')
+    return state.groupPages.find((item) => item.token === value) ?? null
+  }
+
+  function resolveGroupPage(token) {
+    const page = findGroupPage(token)
+    if (page === null) return { status: 'missing' }
+    if (Number(page.expiresAt) > 0 && Date.now() > Number(page.expiresAt)) return { status: 'expired' }
+    const target = findTarget(page.groupOpenid)
+    return {
+      status: 'ok',
+      page: {
+        group: { openid: page.groupOpenid, name: target?.name ?? '' },
+        permissions: { say: page.permissions?.say !== false },
+        expiresAt: Number(page.expiresAt) || 0,
+      },
+    }
+  }
+
+  function handleGroupPages(body) {
+    const action = String(body.action ?? 'list')
+    if (action === 'save') {
+      const groupOpenid = assertGroupOpenid(body.groupOpenid)
+      if (!findTarget(groupOpenid)) throw new Error('请先添加这个群')
+      const expiresRaw = String(body.expiresAt ?? '').trim()
+      const expiresAt = expiresRaw.length > 0 ? Date.parse(expiresRaw) : 0
+      if (expiresRaw.length > 0 && !Number.isFinite(expiresAt)) throw new Error('有效期格式不正确')
+      let page = state.groupPages.find((item) => item.groupOpenid === groupOpenid)
+      if (!page) {
+        page = {
+          groupOpenid,
+          token: randomBytes(18).toString('hex'),
+          createdAt: new Date().toISOString(),
+        }
+        state.groupPages.push(page)
+      }
+      page.expiresAt = expiresAt > 0 ? expiresAt : 0
+      page.permissions = { say: body.say !== false }
+      persistState()
+      return { page }
+    }
+    if (action === 'remove') {
+      const groupOpenid = String(body.groupOpenid ?? '')
+      state.groupPages = state.groupPages.filter((item) => item.groupOpenid !== groupOpenid)
+      persistState()
+      return { removed: true }
+    }
+    return { list: state.groupPages }
+  }
+
+  async function sayGroupPage(token, text) {
+    const resolved = resolveGroupPage(token)
+    if (resolved.status !== 'ok') throw new Error(resolved.status === 'expired' ? '链接已过期' : '分群网页不存在')
+    if (resolved.page.permissions.say !== true) {
+      const error = new Error('你无权限')
+      error.statusCode = 403
+      throw error
+    }
+    const results = await sendTargets(`group:${resolved.page.group.openid}`, text, { kind: 'group-page' })
+    return results
+  }
+
+  function cancelPendingVerifications() {
+    let count = 0
+    for (const entry of [...state.joinVerifications]) {
+      clearVerification(entry)
+      count += 1
+    }
+    return count
+  }
+
   const remoteServer = createRemoteServer({
     getConfig: () => liveConfig,
     sendTargets: (input, text, meta) => sendTargets(input, text, meta),
@@ -2382,6 +2457,10 @@ export async function apply(ctx, config) {
     sendMediaTargets: (input, options, caption, mention) => sendMediaTargets(input, options, caption, mention),
     snapshot: () => snapshot(),
     api: remoteApi,
+    groupPage: {
+      resolve: (token) => resolveGroupPage(token),
+      say: (token, text) => sayGroupPage(token, text),
+    },
     logger,
   })
 
@@ -2743,6 +2822,10 @@ export async function apply(ctx, config) {
       groupBlocks: state.groupBlocks.slice(-200),
       announcements: state.announcements.slice(-50),
       groupManagers: state.groupManagers.slice(-200),
+      groupPages: state.groupPages.map((item) => ({
+        ...item,
+        groupName: findTarget(item.groupOpenid)?.name ?? '',
+      })),
       joinVerifications: state.joinVerifications.map((item) => ({ groupOpenid: item.groupOpenid, memberOpenid: item.memberOpenid, name: item.name, expiresAt: item.expiresAt })),
       joinVerify: {
         enabled: liveConfig.joinVerifyEnabled === true,
