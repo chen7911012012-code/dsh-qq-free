@@ -1364,22 +1364,6 @@ export async function apply(ctx, config) {
     }
   }
 
-  async function resumeDeferredVerifications() {
-    const groups = [...new Set(state.joinVerifications.filter((item) => item.deferred === true).map((item) => item.groupOpenid))]
-    for (const groupOpenid of groups) {
-      if (await isGroupAllMuted(groupOpenid)) continue
-      const entries = state.joinVerifications.filter((item) => item.deferred === true && item.groupOpenid === groupOpenid)
-      for (const entry of entries) {
-        state.joinVerifications = state.joinVerifications.filter((item) => item !== entry)
-        persistState()
-        await startJoinVerification(
-          { group_openid: entry.groupOpenid, member_openid: entry.memberOpenid, username: entry.name },
-          { skipMuteCheck: true, minutes: 5 },
-        )
-      }
-    }
-  }
-
   async function startJoinVerification(data, options = {}) {
     const groupOpenid = String(data.group_openid ?? '')
     const memberOpenid = String(data.member_openid ?? '')
