@@ -48,5 +48,10 @@
         ownerOpenid: ''
         joinVerifyEnabled: false
         joinVerifyGroups: []
+        inactiveCleanupEnabled: false
+        inactiveCleanupGroups: []
+        inactiveCleanupTime: '03:00'
+        inactiveCleanupDays: 30
+        inactiveCleanupMaxLevel: 1
         tunnelEnabled: false
         tunnelBin: ''
