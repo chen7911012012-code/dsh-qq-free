@@ -223,11 +223,17 @@ async function load() {
 $('sayBtn').onclick = async () => {
   const text = $('sayText').value.trim();
   if (!text) { toast('消息不能为空'); return; }
-  const ok = await act('say', { text });
-  if (ok) $('sayText').value = '';
+  $('sayBtn').disabled = true;
+  $('sayText').readOnly = true;
+  try {
+    const ok = await act('say', { text });
+    if (ok) $('sayText').value = '';
+  } finally {
+    $('sayBtn').disabled = false;
+    $('sayText').readOnly = false;
+  }
 };
-$('genBtn').onclick = () => act('generate', { topic: $('topic').value });
-$('joinList').onclick = (event) => {
+$('genBtn').onclick = () => act('generate', { topic: $('topic').value });$('joinList').onclick = (event) => {
   const button = event.target.closest('button[data-join]');
   if (!button) return;
   act('join-approve', { memberOpenid: button.dataset.id, approve: button.dataset.join === 'approve' });
