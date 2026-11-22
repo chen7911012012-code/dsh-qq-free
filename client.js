@@ -1991,7 +1991,7 @@ window.__ModuleLoader__.load({
             h(Card, {
               title: '沉默低等级成员清理',
               wide: true,
-              hint: '指定群、指定时间清理长时间未发言且群聊等级低于 2 级的成员；群主/管理员/主人/代管不会清理。官方成员列表接口目前是内邀能力，未返回等级时会跳过，不会误踢。',
+              hint: '指定群、指定时间清理长时间未发言且群聊等级低于 2 级的成员；群主/管理员/主人/代管不会清理。官方成员列表无权限时自动改用本地已知成员，并按本地发言次数估算等级（少于 10 条按 1 级），不会枚举未见过的人。',
             },
               h('label', { className: 'qqf-row' },
                 h('input', {
@@ -2036,7 +2036,7 @@ window.__ModuleLoader__.load({
                   busy === 'cleanup-run' ? '检查中…' : '立即检查')),
               data.inactiveCleanup?.lastResult
                 ? h('pre', { className: 'qqf-mono', style: { whiteSpace: 'pre-wrap' } },
-                  (data.inactiveCleanup.lastResult.groups ?? []).map((item) => `${item.name || item.groupOpenid}：清理 ${item.removed}，跳过 ${item.skipped}，无等级 ${item.unknownLevel}${item.error ? `，错误 ${item.error}` : ''}`).join('\n'))
+                  (data.inactiveCleanup.lastResult.groups ?? []).map((item) => `${item.name || item.groupOpenid}：清理 ${item.removed}，跳过 ${item.skipped}${item.warning ? `，${item.warning}` : ''}${item.error ? `，错误 ${item.error}` : ''}`).join('\n'))
                 : null),
 
             h(Card, {
