@@ -625,6 +625,21 @@ if (ws) {
   check('开启入群验证', result.status === 200 && result.body.state.joinVerify.enabled === true)
   const readVerifyCode = (memberOpenid) => JSON.parse(readFileSync(join(dataRoot, '.qq-free', 'state.json'), 'utf8'))
     .joinVerifications.find((entry) => entry.memberOpenid === memberOpenid)?.code ?? ''
+
+  groupMuted = true
+  const beforeMuted = sent.length
+  ws.emit({ op: 0, s: 29, t: 'GROUP_MEMBER_ADD', d: { group_openid: GROUP, member_openid: 'DEFER001', username: '禁言新人', member_role: 'member', timestamp: new Date().toISOString() } })
+  await sleep(150)
+  const mutedNotice = sent.slice(beforeMuted).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && JSON.stringify(item.body).includes('检测到禁言'))
+  check('全体禁言时提示下次发言验证', Boolean(mutedNotice) && !sent.slice(beforeMuted).some((item) => item.target.includes('/files')))
+  groupMuted = false
+  ws.emit({ op: 0, s: 30, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-DEFER', content: '在吗', group_openid: GROUP, mentions: [], author: { member_openid: 'DEFER001', member_nickname: '禁言新人', member_role: 'member' } } })
+  await sleep(150)
+  const deferredChallenge = sent.slice(beforeMuted).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && JSON.stringify(item.body).includes('5 分钟') && JSON.stringify(item.body).includes('DEFER001'))
+  check('禁言结束发言后五分钟验证', Boolean(deferredChallenge))
+  await call('/qq-free/join-verify/cancel', 'POST', {})
+  groupMuted = false
+
   const beforeVerify = sent.length
   ws.emit({ op: 0, s: 30, t: 'GROUP_MEMBER_ADD', d: { group_openid: GROUP, member_openid: 'VERIFY01', username: '新人一', member_role: 'member', timestamp: new Date().toISOString() } })
   await sleep(200)
