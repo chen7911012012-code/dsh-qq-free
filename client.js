@@ -2042,7 +2042,7 @@ window.__ModuleLoader__.load({
                   data.joinVerifications.map((entry) => h('li', { key: `${entry.groupOpenid}-${entry.memberOpenid}`, className: 'qqf-target' },
                     h('div', { className: 'qqf-target-main' },
                       h('span', { className: 'qqf-target-name' }, entry.name || entry.memberOpenid),
-                      h('span', { className: 'qqf-mono' }, `${entry.groupOpenid} · 到期 ${new Date(entry.expiresAt).toLocaleTimeString('zh-CN', { hour12: false })}`)))))
+                      h('span', { className: 'qqf-mono' }, `${entry.groupOpenid} · ${entry.deferred ? '等待禁言结束/下次发言' : `到期 ${new Date(entry.expiresAt).toLocaleTimeString('zh-CN', { hour12: false })}`}`)))))
                 : h('p', { className: 'qqf-empty' }, '当前没有待验证的新成员。')),
 
             h(Card, {
