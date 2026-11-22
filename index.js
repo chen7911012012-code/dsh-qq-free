@@ -1460,7 +1460,7 @@ export async function apply(ctx, config) {
         if (!force && state.cleanupSlots[groupOpenid] === slot) continue
         state.cleanupSlots[groupOpenid] = slot
         persistState()
-        const target = findTarget(groupOpenid)
+        const target = state.targets.find((item) => item.scope === 'group' && item.openid === groupOpenid)
         const groupResult = { groupOpenid, name: target?.name ?? '', removed: 0, skipped: 0, unknownLevel: 0, warning: '', error: '' }
         try {
           let members = []
@@ -2387,7 +2387,7 @@ export async function apply(ctx, config) {
     const page = findGroupPage(token)
     if (page === null) return { status: 'missing' }
     if (Number(page.expiresAt) > 0 && Date.now() > Number(page.expiresAt)) return { status: 'expired' }
-    const target = findTarget(page.groupOpenid)
+    const target = state.targets.find((item) => item.scope === 'group' && item.openid === page.groupOpenid)
     return {
       status: 'ok',
       page: {
@@ -2823,7 +2823,7 @@ export async function apply(ctx, config) {
       groupManagers: state.groupManagers.slice(-200),
       groupPages: state.groupPages.map((item) => ({
         ...item,
-        groupName: findTarget(item.groupOpenid)?.name ?? '',
+        groupName: state.targets.find((target) => target.scope === 'group' && target.openid === item.groupOpenid)?.name ?? '',
       })),
       joinVerifications: state.joinVerifications.map((item) => ({ groupOpenid: item.groupOpenid, memberOpenid: item.memberOpenid, name: item.name, expiresAt: item.expiresAt })),
       joinVerify: {
