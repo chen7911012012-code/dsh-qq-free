@@ -1403,7 +1403,7 @@ export async function apply(ctx, config) {
       persistState()
       try {
         await sendText({ scope: 'group', openid: groupOpenid, name: '入群验证' },
-          '检测到禁言，禁言结束后首次发言将会触发验证。',
+          '检测到禁言，禁言结束后发送任意消息再进行验证。',
           { kind: 'join-verify', ignoreDailyLimit: true })
         appendLog({ at: new Date().toISOString(), scope: 'group', openid: groupOpenid, name: '入群验证', text: `${name} 入群时检测到禁言，已提示`, ok: true, kind: 'join-verify' })
       } catch (error) {
