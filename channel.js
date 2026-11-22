@@ -574,15 +574,15 @@ export function createChatChannel(deps) {
       answer = '在的，直接问我问题就行。'
       source = 'prompt'
     } else {
-      // 命中问答库就直接用库里的答案；未命中走 DeepSeek
-      const match = cfg.chatUseQa === false ? null : searchQa(question)
+      // 先判断是提问还是闲聊：提问优先查问答库，闲聊直接用智能体
+      const isQuestion = typeof classifyQuestion === 'function' ? await classifyQuestion(question) : true
+      const match = isQuestion && cfg.chatUseQa !== false ? searchQa(question) : null
       if (match !== null) {
         answer = String(match.entry.answer ?? '').trim()
         source = 'library'
         recordQaHit(match.entry)
       }
       if (answer.length === 0) {
-        const isQuestion = typeof classifyQuestion === 'function' ? await classifyQuestion(question) : true
         answer = await generateReply({
           question,
           history,
