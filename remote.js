@@ -101,7 +101,7 @@ export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMe
       res.end(renderGroupPage(token))
       return
     }
-    if (url.pathname === '/gapi/state' || url.pathname === '/gapi/say') {
+    if (url.pathname === '/gapi/state' || url.pathname === '/gapi/overview' || url.pathname === '/gapi/say' || url.pathname === '/gapi/action') {
       const token = String(url.searchParams.get('token') ?? '')
       const resolved = groupPage?.resolve ? groupPage.resolve(token) : { status: 'missing' }
       if (resolved.status !== 'ok') {
@@ -117,8 +117,28 @@ export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMe
         })
         return
       }
+      if (url.pathname === '/gapi/overview') {
+        try {
+          const overview = await groupPage.overview(token)
+          json(res, 200, { ok: true, ...overview })
+        } catch (error) {
+          json(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
+        }
+        return
+      }
       if (req.method !== 'POST') {
         json(res, 405, { ok: false, error: 'method not allowed' })
+        return
+      }
+      if (url.pathname === '/gapi/action') {
+        const body = await readBody(req)
+        try {
+          const result = await groupPage.action(token, String(body.action ?? ''), body)
+          json(res, 200, { ok: true, ...(result ?? {}) })
+        } catch (error) {
+          const status = Number(error?.statusCode) || 400
+          json(res, status, { ok: false, error: error instanceof Error ? error.message : String(error) })
+        }
         return
       }
       if (resolved.page.permissions?.say !== true) {
