@@ -164,8 +164,8 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
       </div>
 
       <div class="card">
-        <strong style="font-size:14px">签到记录（全部同步）</strong>
-        <div class="list" id="checkinList"></div>
+        <strong style="font-size:14px">今日运势记录（全部同步）</strong>
+        <div class="list" id="fortuneList"></div>
       </div>
 
       <div class="card">
@@ -359,13 +359,13 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
     })
 
     var joins = $('joinList'); joins.innerHTML = ''
-    var checkinList = $('checkinList'); checkinList.innerHTML = ''
-    ;(state.checkins || []).slice(0, 20).forEach(function (entry) {
+    var fortuneList = $('fortuneList'); fortuneList.innerHTML = ''
+    ;(state.fortunes || []).slice(0, 20).forEach(function (entry) {
       var div = document.createElement('div'); div.className = 'item'
       var main = document.createElement('div'); main.className = 'item-main'
-      var name = document.createElement('div'); name.className = 'q'; name.textContent = (entry.name || entry.memberOpenid) + ' · ' + entry.count + ' 次 · ' + entry.points + ' 积分'
-      var fortune = document.createElement('div'); fortune.className = 'a'; fortune.textContent = entry.lastFortune || ''
-      main.appendChild(name); main.appendChild(fortune); div.appendChild(main); checkinList.appendChild(div)
+      var name = document.createElement('div'); name.className = 'q'; name.textContent = (entry.name || entry.memberOpenid) + ' · ' + (entry.date || '')
+      var fortune = document.createElement('div'); fortune.className = 'a'; fortune.textContent = entry.fortune || ''
+      main.appendChild(name); main.appendChild(fortune); div.appendChild(main); fortuneList.appendChild(div)
     })
     ;(state.pendingJoins || []).forEach(function (entry) {
       var memberId = entry.member_openid || entry.memberOpenid || ''
