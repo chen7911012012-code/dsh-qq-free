@@ -1401,7 +1401,7 @@ export async function apply(ctx, config) {
       persistState()
       try {
         await sendText({ scope: 'group', openid: groupOpenid, name: '入群验证' },
-          '检测到禁言，验证将会在下一次发送消息时进行验证。',
+          '检测到禁言，禁言结束后首次发言将会触发验证。',
           { kind: 'join-verify', ignoreDailyLimit: true })
       } catch (error) {
         logger.warn(`qq-free: 发送禁言提示失败 ${error instanceof Error ? error.message : String(error)}`)
@@ -2955,9 +2955,6 @@ export async function apply(ctx, config) {
       })
       void runInactiveCleanup().catch((error) => {
         logger.warn(`qq-free: 沉默清理失败 ${error instanceof Error ? error.message : String(error)}`)
-      })
-      void resumeDeferredVerifications().catch((error) => {
-        logger.warn(`qq-free: 恢复禁言验证失败 ${error instanceof Error ? error.message : String(error)}`)
       })
     }
     tick()
