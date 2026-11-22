@@ -2160,7 +2160,7 @@ window.__ModuleLoader__.load({
               h('div', { className: 'qqf-row' },
                 [
                   ['chat', 'AI 聊天'],
-                  ['auto', '自动发言'],
+                  ['auto', '自主发言'],
                   ['welcome', '入群欢迎'],
                   ['joinNotice', '入群申请通知'],
                   ['joinRequest', '入群申请处理'],
