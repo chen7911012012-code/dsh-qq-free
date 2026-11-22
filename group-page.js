@@ -55,6 +55,7 @@ section{display:none}section.on{display:block}
     <button data-tab="join">入群申请</button>
     <button data-tab="members">成员管理</button>
     <button data-tab="settings">群设置</button>
+    <button data-tab="checkin">签到</button>
     <button data-tab="announce">定时公告</button>
   </div>
   <section id="tab-say" class="on">
@@ -118,6 +119,15 @@ section{display:none}section.on{display:block}
       <button class="ghost" id="infoBtn">获取群信息</button>
       <pre class="muted" id="infoText" style="white-space:pre-wrap"></pre>
     </div>
+  </section>
+  <section id="tab-checkin">
+    <div class="card">
+      <h2>群签到</h2>
+      <label class="check"><input type="checkbox" id="checkinOn"> 在本群启用签到</label>
+      <div class="row" style="margin-top:8px"><button id="checkinSave">保存签到开关</button></div>
+      <p class="muted">成员每天发送「签到」或「打卡」可随机获得积分和今日运势。</p>
+    </div>
+    <div class="card"><h2>签到排行</h2><ul class="list" id="checkinList"></ul><p class="muted" id="checkinEmpty">暂无签到记录</p></div>
   </section>
   <section id="tab-announce">
     <div class="card">
@@ -196,6 +206,10 @@ function render() {
   $('cleanupTime').value = data.cleanup?.time || '03:00';
   $('cleanupDays').value = data.cleanup?.days || 30;
   $('managerList').innerHTML = (data.managers || []).map((item) => '<li class="item"><div>' + (item.name || item.memberOpenid) + '<div class="muted">' + item.memberOpenid + '</div></div><button class="sm danger" data-manager-del="' + item.memberOpenid + '">取消</button></li>').join('');
+  $('checkinOn').checked = data.checkin?.enabled === true;
+  const checkins = data.checkin?.leaderboard || [];
+  $('checkinList').innerHTML = checkins.map((item) => '<li class="item"><div><div>' + (item.name || item.memberOpenid) + '</div><div class="muted">累计 ' + item.count + ' 次 · ' + item.points + ' 积分</div></div><div class="muted">' + (item.lastFortune || '') + '</div></li>').join('');
+  $('checkinEmpty').style.display = checkins.length ? 'none' : 'block';
   $('annList').innerHTML = (data.announcements || []).map((item) => '<li class="item"><div><div>' + (item.name || '公告') + ' · ' + (item.date || '每天') + ' ' + item.time + '</div><div class="muted">' + item.text + '</div></div><div class="row"><button class="sm" data-ann-run="' + item.id + '">立即发</button><button class="sm danger" data-ann-del="' + item.id + '">删除</button></div></li>').join('');
 }
 async function load() {
@@ -244,9 +258,9 @@ $('welcomeBtn').onclick = () => act('welcome-save', { enabled: $('welcomeOn').ch
 $('verifyBtn').onclick = () => act('join-verify-save', { enabled: $('verifyOn').checked });
 $('cancelVerifyBtn').onclick = () => act('join-verify-cancel', {});
 $('cleanupBtn').onclick = () => act('cleanup-save', { enabled: $('cleanupOn').checked, time: $('cleanupTime').value, days: Number($('cleanupDays').value) || 30 });
-$('managerAdd').onclick = () => act('manager-add', { memberOpenid: $('managerOpenid').value.trim(), name: $('managerName').value.trim() });
-$('managerList').onclick = (event) => { const button = event.target.closest('button[data-manager-del]'); if (button) act('manager-remove', { memberOpenid: button.dataset.managerDel }); };
+$('managerAdd').onclick = () => act('manager-add', { memberOpenid: $('managerOpenid').value.trim(), name: $('managerName').value.trim() });$('managerList').onclick = (event) => { const button = event.target.closest('button[data-manager-del]'); if (button) act('manager-remove', { memberOpenid: button.dataset.managerDel }); };
 $('infoBtn').onclick = async () => { const result = await act('group-info', {}); if (result && result.text) $('infoText').textContent = result.text; };
+$('checkinSave').onclick = () => act('checkin-save', { enabled: $('checkinOn').checked });
 $('annSave').onclick = () => act('announcement-save', { name: $('annName').value, date: $('annDate').value, time: $('annTime').value || '09:00', text: $('annText').value });
 $('annList').onclick = (event) => {
   const button = event.target.closest('button');
