@@ -625,19 +625,19 @@ if (ws) {
   await call('/qq-free/join-verify/cancel', 'POST', {})
   await call('/qq-free/config', 'POST', { joinVerifyEnabled: false, joinVerifyGroups: [] })
 
-  result = await call('/qq-free/config', 'POST', { checkinEnabled: true, checkinGroups: [GROUP] })
-  check('开启签到', result.status === 200 && result.body.state.checkin.enabled === true)
-  const beforeCheckin = sent.length
-  ws.emit({ op: 0, s: 36, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-CHECKIN', content: '<@BOT> 签到', group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'CHECKIN1', member_nickname: '签到员', member_role: 'member' } } })
+  result = await call('/qq-free/config', 'POST', { fortuneEnabled: true, fortuneGroups: [GROUP], fortuneImageEnabled: false })
+  check('开启今日运势', result.status === 200 && result.body.state.fortune.enabled === true)
+  const beforeFortune = sent.length
+  ws.emit({ op: 0, s: 36, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-FORTUNE', content: '今日运势', group_openid: GROUP, mentions: [], author: { member_openid: 'FORTUNE1', member_nickname: '运势员', member_role: 'member' } } })
   await sleep(150)
-  const checkinReply = sent.slice(beforeCheckin).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-CHECKIN')
-  check('签到获得积分和今日运势', Boolean(checkinReply) && JSON.stringify(checkinReply.body).includes('签到成功') && JSON.stringify(checkinReply.body).includes('今日运势'))
-  ws.emit({ op: 0, s: 37, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-CHECKIN2', content: '<@BOT> 签到', group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'CHECKIN1', member_nickname: '签到员', member_role: 'member' } } })
+  const fortuneReply = sent.slice(beforeFortune).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-FORTUNE')
+  check('无需 @ 即可抽今日运势', Boolean(fortuneReply) && JSON.stringify(fortuneReply.body).includes('今日运势'))
+  ws.emit({ op: 0, s: 37, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-FORTUNE2', content: '今日运势', group_openid: GROUP, mentions: [], author: { member_openid: 'FORTUNE1', member_nickname: '运势员', member_role: 'member' } } })
   await sleep(150)
-  const againReply = sent.slice(beforeCheckin).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-CHECKIN2')
-  check('同一天重复签到被拒绝', Boolean(againReply) && JSON.stringify(againReply.body).includes('已经签到'))
-  check('签到数据保存在本地', (await call('/qq-free/state')).body.checkins.some((entry) => entry.memberOpenid === 'CHECKIN1' && entry.count === 1))
-  await call('/qq-free/config', 'POST', { checkinEnabled: false, checkinGroups: [] })
+  const againFortuneReply = sent.slice(beforeFortune).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-FORTUNE2')
+  check('同一天第二次返回上次运势', Boolean(againFortuneReply) && JSON.stringify(againFortuneReply.body).includes('已经抽过') && JSON.stringify(againFortuneReply.body).includes('上次运势'))
+  check('今日运势保存在本地', (await call('/qq-free/state')).body.fortunes.some((entry) => entry.memberOpenid === 'FORTUNE1' && entry.date.length === 10))
+  await call('/qq-free/config', 'POST', { fortuneEnabled: false, fortuneGroups: [] })
 
   result = await call('/qq-free/config', 'POST', {
     inactiveCleanupEnabled: true, inactiveCleanupGroups: [GROUP], inactiveCleanupTime: '03:00', inactiveCleanupDays: 1, inactiveCleanupMaxLevel: 1,
