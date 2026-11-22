@@ -494,6 +494,20 @@ if (ws) {
   const modKick = sent.filter((item) => item.target.includes('/batch_remove_members')).at(-1)
   check('群内 @成员 踢人', modKick?.body?.member_openids?.[0] === 'TARGET123456', JSON.stringify(modKick?.body))
 
+  const beforeNoAt = sent.length
+  ws.emit({
+    op: 0, s: 12, t: 'GROUP_MESSAGE_CREATE',
+    d: {
+      id: 'EV-MUTE-NOAT', content: '禁<@TARGET123456>', group_openid: GROUP,
+      mentions: [{ member_openid: 'TARGET123456', is_you: false }],
+      author: { member_openid: 'ADMIN2', member_nickname: '操作员', member_role: 'admin' },
+    },
+  })
+  await sleep(150)
+  const noAtMute = sent.slice(beforeNoAt).find((item) => item.target.includes('/restrict_chat_setting'))
+  const noAtReply = sent.slice(beforeNoAt).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-MUTE-NOAT')
+  check('不 @ 机器人也能禁@成员并显示操作人', noAtMute?.body?.members?.[0]?.member_openid === 'TARGET123456' && noAtReply?.body?.content?.includes('操作人：操作员'), JSON.stringify(noAtReply?.body))
+
   ws.emit({
     op: 0, s: 12, t: 'GROUP_JOIN_REQUEST',
     d: { group_openid: GROUP, member_openid: 'MEMBERREQ2', join_request_id: 'JOINREQ654321', username: '另一位' },
