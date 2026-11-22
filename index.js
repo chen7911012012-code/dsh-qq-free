@@ -3214,7 +3214,7 @@ export async function apply(ctx, config) {
         .filter((item) => item && typeof item.memberOpenid === 'string')
         .sort((left, right) => String(right.date ?? '').localeCompare(String(left.date ?? '')))
         .slice(0, 100),
-      joinVerifications: state.joinVerifications.map((item) => ({ groupOpenid: item.groupOpenid, memberOpenid: item.memberOpenid, name: item.name, expiresAt: item.expiresAt })),
+      joinVerifications: state.joinVerifications.map((item) => ({ groupOpenid: item.groupOpenid, memberOpenid: item.memberOpenid, name: item.name, expiresAt: item.expiresAt ?? 0, deferred: item.deferred === true })),
       joinVerify: {
         enabled: liveConfig.joinVerifyEnabled === true,
         groups: Array.isArray(liveConfig.joinVerifyGroups) ? liveConfig.joinVerifyGroups : [],
