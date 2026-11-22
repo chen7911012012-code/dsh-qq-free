@@ -486,7 +486,7 @@ if (ws) {
     op: 0, s: 11, t: 'GROUP_MESSAGE_CREATE',
     d: {
       id: 'EV-KICK', content: '踢人', group_openid: GROUP,
-      mentions: [{ member_openid: 'TARGET123456', is_you: false }],
+      mentions: [{ bot: true, is_you: true }, { member_openid: 'TARGET123456', is_you: false }],
       author: { member_openid: 'ADMIN1', member_role: 'admin' },
     },
   })
