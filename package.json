@@ -33,6 +33,7 @@
     "github.js",
     "tunnel.js",
     "verification-image.js",
+    "group-page.js",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
