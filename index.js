@@ -1613,6 +1613,15 @@ export async function apply(ctx, config) {
     return `今日运势：${fortune}\n（每天只能抽一次，0 点刷新）`
   }
 
+  function operatorLabel(data) {
+    return String(data.author?.member_nickname ?? data.author?.username ?? data.author?.member_openid ?? '未知成员')
+  }
+
+  function operatorNote(data, targetOpenid = '') {
+    if (targetOpenid.length > 0 && targetOpenid === String(data.author?.member_openid ?? '')) return ''
+    return `（操作人：${operatorLabel(data)}）`
+  }
+
   async function handleGroupCommand(data) {
     captureTestGroupOwner(data)
     const role = String(data.author?.member_role ?? '')
@@ -1671,7 +1680,7 @@ export async function apply(ctx, config) {
     }
 
     // 群内 @ 成员做禁言 / 解禁 / 踢人（支持「禁@x」「解@x」「飞@x」和「禁言 @x 60」）
-    const alias = /^(禁|解|飞)$/u.exec(text)
+    const alias = /^(禁|解|飞|踢)$/u.exec(text)
     const modMatch = alias !== null
       ? [text, alias[1] === '禁' ? '禁言' : alias[1] === '解' ? '解禁' : '踢人', '']
       : /^(禁言|解禁|解除禁言|踢人|踢出|移出)\s*(\d+)?$/u.exec(text)
