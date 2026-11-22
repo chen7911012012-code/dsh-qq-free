@@ -1595,6 +1595,10 @@ export async function apply(ctx, config) {
     const targetOpenid = String(targetMention?.member_openid ?? '')
     const targetName = String(targetMention?.username ?? targetMention?.member_nickname ?? '')
 
+    // 签到对所有群成员开放，不受管理员权限限制
+    const checkinReply = handleCheckin(data)
+    if (checkinReply !== null) return checkinReply
+
     // 代管管理：只有主人、群主、群管理员可以添加/取消
     if (/^(添加代管|取消代管)$/.test(text)) {
       if (!canConfigureManagers(memberOpenid, role)) return '只有主人、群主或群管理员可以管理代管。'
@@ -2539,6 +2543,15 @@ export async function apply(ctx, config) {
         time: liveConfig.inactiveCleanupTime || '03:00',
         days: Number(liveConfig.inactiveCleanupDays) || 30,
       },
+      checkin: {
+        enabled: liveConfig.checkinEnabled === true
+          && ((Array.isArray(liveConfig.checkinGroups) ? liveConfig.checkinGroups : []).length === 0
+            || (Array.isArray(liveConfig.checkinGroups) ? liveConfig.checkinGroups : []).includes(groupOpenid)),
+        leaderboard: Object.values(state.checkins)
+          .filter((item) => item && item.groupOpenid === groupOpenid)
+          .sort((left, right) => (Number(right.count) || 0) - (Number(left.count) || 0) || (Number(right.points) || 0) - (Number(left.points) || 0))
+          .slice(0, 50),
+      },
     }
   }
 
@@ -2682,6 +2695,19 @@ export async function apply(ctx, config) {
     }
     if (action === 'announcement-run') {
       return runAnnouncements(String(body.id ?? ''))
+    }
+    if (action === 'checkin-save') {
+      const configured = Array.isArray(liveConfig.checkinGroups) ? liveConfig.checkinGroups : []
+      const allGroups = state.targets.filter((item) => item.scope === 'group').map((item) => item.openid)
+      const current = configured.length > 0 ? configured : allGroups
+      const groups = body.enabled === true
+        ? [...new Set([...current, groupOpenid])]
+        : current.filter((item) => item !== groupOpenid)
+      saveConfigPatch({
+        checkinEnabled: body.enabled === true || groups.length > 0,
+        checkinGroups: groups,
+      })
+      return { ok: true }
     }
     if (action === 'cleanup-save') {
       const current = Array.isArray(liveConfig.inactiveCleanupGroups) ? liveConfig.inactiveCleanupGroups : []
