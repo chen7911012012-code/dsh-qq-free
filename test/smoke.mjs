@@ -584,6 +584,15 @@ if (ws) {
   const infoReply = sent.slice(beforeInfo).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-INFO')
   check('@某人 获取信息显示 openid 和入群时间', Boolean(infoReply) && infoReply.body.content.includes('openid：TARGET123456') && infoReply.body.content.includes('入群时间'))
 
+  const beforeInfoDenied = sent.length
+  ws.emit({
+    op: 0, s: 18, t: 'GROUP_MESSAGE_CREATE',
+    d: { id: 'EV-INFO-DENIED', content: '<@TARGET123456> 获取信息', group_openid: GROUP, mentions: [{ bot: true, is_you: true }, { member_openid: 'TARGET123456', username: '目标' }], author: { member_openid: 'NORMALUSER2', member_role: 'member' } },
+  })
+  await sleep(150)
+  const deniedInfoReply = sent.slice(beforeInfoDenied).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-INFO-DENIED')
+  check('普通成员不能获取成员信息', Boolean(deniedInfoReply) && deniedInfoReply.body.content.includes('只有群主、管理员或主人'))
+
   result = await call('/qq-free/announcements', 'POST', {
     action: 'save', name: '测试公告', groupOpenids: [GROUP], date: '', time: '09:00', text: '重要通知', enabled: true,
   })
