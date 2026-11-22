@@ -27,6 +27,7 @@ const tools = []
 const cleanups = []
 const sections = []
 let llmFail = false
+let groupMuted = false
 
 class MockWebSocket {
   static instances = []
@@ -139,6 +140,12 @@ globalThis.fetch = async (url, init = {}) => {
     sent.push({ target, method, body, authorization: init.headers.authorization })
     if (method === 'GET' && /\/v2\/users\/[^/]+\/info$/.test(target)) {
       return new Response(JSON.stringify({ username: '申请人', avatar: 'https://example.com/avatar.png', allow_proactive_msg: true }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+    if (method === 'GET' && target.includes('/restrict_chat_setting')) {
+      return new Response(JSON.stringify({
+        global_rule: { mode: groupMuted ? 'all' : 'none', schedule_rules: [], recurring_rules: [] },
+        members: [],
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
     }
     if (method === 'POST' && target.endsWith('/files')) {
       return new Response(JSON.stringify({ file_uuid: 'f1', file_info: 'F1', ttl: 300, id: 'IMG-1' }), { status: 200, headers: { 'content-type': 'application/json' } })
