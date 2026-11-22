@@ -344,6 +344,7 @@ if (ws) {
   ws.emit({ op: 0, s: 6, t: 'GROUP_ADD_ROBOT', d: { group_openid: 'NEWGROUPOPENID99999', group_name: '新群' } })
   await sleep(120)
   check('机器人被拉进新群后自动出现在目标里', (await call('/qq-free/state')).body.targets.some((target) => target.openid === 'NEWGROUPOPENID99999'))
+  check('新群默认屏蔽全部功能', (await call('/qq-free/state')).body.groupBlocks.some((entry) => entry.groupOpenid === 'NEWGROUPOPENID99999' && entry.all === true))
 
   const beforeChat = sent.length
   ws.emit({ op: 0, s: 5, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-CHAT', content: '<@BOT> 今天好累', group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'ASKER1', member_role: 'member' } } })
