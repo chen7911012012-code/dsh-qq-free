@@ -1391,6 +1391,88 @@ export async function apply(ctx, config) {
     return { handled: true, reply: '请 @机器人 回复图片中的 6 位验证码。' }
   }
 
+  let cleanupBusy = false
+
+  async function listGroupMembers(groupOpenid) {
+    const members = []
+    let cursor = ''
+    for (let page = 0; page < 20; page += 1) {
+      const data = await groupApi('GET', `/v2/groups/${encodeURIComponent(groupOpenid)}/members?cursor=${encodeURIComponent(cursor)}`)
+      const list = Array.isArray(data.members) ? data.members : []
+      members.push(...list)
+      cursor = String(data.next_cursor ?? '')
+      if (cursor.length === 0 || list.length === 0) break
+    }
+    return members
+  }
+
+  async function runInactiveCleanup(force = false) {
+    if (cleanupBusy) return { skipped: true }
+    if (!force && liveConfig.inactiveCleanupEnabled !== true) return { skipped: true }
+    const enabledGroups = Array.isArray(liveConfig.inactiveCleanupGroups) ? liveConfig.inactiveCleanupGroups : []
+    if (enabledGroups.length === 0) return { skipped: true }
+    cleanupBusy = true
+    const now = new Date()
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    const configuredTime = String(liveConfig.inactiveCleanupTime || '03:00')
+    if (!force && hhmm !== configuredTime) {
+      cleanupBusy = false
+      return { skipped: true }
+    }
+    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const days = Math.max(1, Number(liveConfig.inactiveCleanupDays) || 30)
+    const maxLevel = Math.max(0, Number(liveConfig.inactiveCleanupMaxLevel) || 1)
+    const results = []
+    try {
+      for (const groupOpenid of enabledGroups) {
+        const slot = `${dateKey} ${configuredTime}`
+        if (!force && state.cleanupSlots[groupOpenid] === slot) continue
+        state.cleanupSlots[groupOpenid] = slot
+        persistState()
+        const target = findTarget(groupOpenid)
+        const groupResult = { groupOpenid, name: target?.name ?? '', removed: 0, skipped: 0, unknownLevel: 0, error: '' }
+        try {
+          const members = await listGroupMembers(groupOpenid)
+          const remove = []
+          for (const member of members) {
+            const memberOpenid = String(member.member_openid ?? '')
+            if (memberOpenid.length === 0) continue
+            const role = String(member.member_role ?? '')
+            if (member.bot === true || role === 'owner' || role === 'admin') { groupResult.skipped += 1; continue }
+            if (isOwnerMember(memberOpenid) || isGroupDelegate(groupOpenid, memberOpenid)) { groupResult.skipped += 1; continue }
+            const levelRaw = member.level ?? member.member_level ?? member.group_level
+            const level = Number(levelRaw)
+            if (!Number.isFinite(level)) { groupResult.unknownLevel += 1; continue }
+            if (level >= 2 || level > maxLevel) { groupResult.skipped += 1; continue }
+            const activity = state.memberActivity[`${groupOpenid}:${memberOpenid}`]
+            const lastRaw = activity?.lastAt ?? member.joined_at ?? member.joinedAt
+            const lastAt = Date.parse(String(lastRaw ?? ''))
+            if (!Number.isFinite(lastAt)) { groupResult.skipped += 1; continue }
+            const inactiveDays = (Date.now() - lastAt) / 86_400_000
+            if (inactiveDays < days) { groupResult.skipped += 1; continue }
+            remove.push(memberOpenid)
+          }
+          if (remove.length > 0) {
+            await groupApi('POST', `/v2/groups/${encodeURIComponent(groupOpenid)}/batch_remove_members`, { member_openids: remove })
+            groupResult.removed = remove.length
+            appendLog({
+              at: new Date().toISOString(), scope: 'group', openid: groupOpenid, name: target?.name || '沉默清理',
+              text: `清理 ${remove.length} 名沉默低等级成员`, ok: true, kind: 'inactive-cleanup',
+            })
+          }
+        } catch (error) {
+          groupResult.error = error instanceof Error ? error.message : String(error)
+        }
+        results.push(groupResult)
+      }
+      state.lastCleanup = { at: new Date().toISOString(), groups: results }
+      persistState()
+      return { results }
+    } finally {
+      cleanupBusy = false
+    }
+  }
+
   async function handleGroupCommand(data) {
     captureTestGroupOwner(data)
     const role = String(data.author?.member_role ?? '')
@@ -2070,6 +2152,7 @@ export async function apply(ctx, config) {
     onGroupAllBlocked: (groupOpenid) => isGroupAllBlocked(groupOpenid),
     onGroupFeatureBlocked: (groupOpenid, feature) => isGroupFeatureBlocked(groupOpenid, feature),
     onInfoCommand: (data) => handleMemberInfo(data),
+    onMemberActivity: (data) => recordMemberActivity(data),
     onVerifyCode: (data) => handleVerifyCode(data),
     logger,
   })
@@ -2317,6 +2400,9 @@ export async function apply(ctx, config) {
     const tick = () => {
       void runAnnouncements().catch((error) => {
         logger.warn(`qq-free: 定时公告失败 ${error instanceof Error ? error.message : String(error)}`)
+      })
+      void runInactiveCleanup().catch((error) => {
+        logger.warn(`qq-free: 沉默清理失败 ${error instanceof Error ? error.message : String(error)}`)
       })
     }
     tick()
@@ -3047,6 +3133,16 @@ export async function apply(ctx, config) {
           return
         }
         sendJson(res, 200, { ok: true, list: state.groupManagers, state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/qq-free/inactive-cleanup',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        await readJsonBody(req)
+        sendJson(res, 200, { ok: true, ...(await runInactiveCleanup(true)), state: snapshot() })
       }),
     }))
 
