@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-qq-free",
-  "version": "1.23.0",
+  "version": "1.24.0",
   "private": true,
   "type": "module",
   "description": "QQ 官方机器人自由发言台：主动消息、DeepSeek 对话、问答库、入群欢迎与群管理，配网页控制台。",
