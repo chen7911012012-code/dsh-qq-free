@@ -48,8 +48,9 @@
         ownerOpenid: ''
         joinVerifyEnabled: false
         joinVerifyGroups: []
-        checkinEnabled: true
-        checkinGroups: []
+        fortuneEnabled: true
+        fortuneGroups: []
+        fortuneImageEnabled: true
         inactiveCleanupEnabled: false
         inactiveCleanupGroups: []
         inactiveCleanupTime: '03:00'
