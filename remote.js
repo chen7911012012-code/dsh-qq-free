@@ -185,8 +185,8 @@ export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMe
           pendingJoins: state.pendingJoins,
           blockedMembers: state.blockedMembers,
           blockedMentions: state.blockedMentions,
-          checkin: state.checkin,
-          checkins: state.checkins,
+          fortune: state.fortune,
+          fortunes: state.fortunes,
           log: state.log,
         })
         return
