@@ -3275,6 +3275,27 @@ export async function apply(ctx, config) {
 
     disposers.push(webServer.register({
       kind: 'exact',
+      path: '/qq-free/group-pages',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const result = handleGroupPages(body)
+        sendJson(res, 200, { ok: true, ...result, state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/qq-free/join-verify/cancel',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const count = cancelPendingVerifications()
+        sendJson(res, 200, { ok: true, cancelled: count, state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
       path: '/qq-free/group-info',
       handler: route(async (req, res) => {
         if (!requirePost(req, res)) return
