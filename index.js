@@ -1987,6 +1987,8 @@ export async function apply(ctx, config) {
       `openid：${memberOpenid}`,
       `入群时间：${joinedAt ? formatApplyTime(joinedAt) : '未知（官方成员详情接口未开放）'}`,
     ]
+    const note = operatorNote(data, memberOpenid)
+    if (note.length > 0) lines.push(note)
     return lines.join('\n')
   }
 
