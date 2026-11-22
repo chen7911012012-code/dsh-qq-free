@@ -370,6 +370,15 @@ export function createChatChannel(deps) {
       openid = data.author?.user_openid ?? data.author?.id
     }
     if (scope === null || typeof openid !== 'string' || openid.length === 0) return
+    // 屏蔽其他机器人（Q群管家等）的消息
+    if (data.author?.bot === true || data.author?.is_bot === true) return
+    // 屏蔽所有群里的 @所有人 消息
+    if (scope === 'group') {
+      const mentions = Array.isArray(data.mentions) ? data.mentions : []
+      const rawContent = String(data.content ?? '')
+      if (mentions.some((mention) => mention && (mention.scope === 'all' || mention.is_everyone === true))
+        || /<@all>|<qqbot-at-everyone/i.test(rawContent)) return
+    }
     if (scope === 'group' && typeof onGroupSeen === 'function') {
       try { onGroupSeen({ groupOpenid: openid, groupName: data.group_name }) } catch { /* ignore */ }
     }
