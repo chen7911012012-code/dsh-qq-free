@@ -65,6 +65,7 @@ export function createChatChannel(deps) {
   const onGroupAllBlocked = deps.onGroupAllBlocked
   const onGroupFeatureBlocked = deps.onGroupFeatureBlocked
   const onInfoCommand = deps.onInfoCommand
+  const onFortune = deps.onFortune
   const onVerifyCode = deps.onVerifyCode
   const logger = deps.logger ?? console
 
@@ -483,6 +484,20 @@ export function createChatChannel(deps) {
       }
       if (typeof infoReply === 'string' && infoReply.length > 0) {
         await sendReply('group', openid, id, infoReply)
+        return
+      }
+    }
+
+    // 今日运势：无需 @机器人，任何人发「今日运势」都触发，每天一次
+    if (scope === 'group' && typeof onFortune === 'function') {
+      let fortuneReply = null
+      try {
+        fortuneReply = await onFortune(data)
+      } catch (error) {
+        logger.warn(`qq-free channel: 今日运势失败 ${error instanceof Error ? error.message : String(error)}`)
+      }
+      if (typeof fortuneReply === 'string' && fortuneReply.length > 0) {
+        await sendReply('group', openid, id, fortuneReply)
         return
       }
     }
