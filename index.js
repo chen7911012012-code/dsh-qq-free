@@ -1458,9 +1458,21 @@ export async function apply(ctx, config) {
         state.cleanupSlots[groupOpenid] = slot
         persistState()
         const target = findTarget(groupOpenid)
-        const groupResult = { groupOpenid, name: target?.name ?? '', removed: 0, skipped: 0, unknownLevel: 0, error: '' }
+        const groupResult = { groupOpenid, name: target?.name ?? '', removed: 0, skipped: 0, unknownLevel: 0, warning: '', error: '' }
         try {
-          const members = await listGroupMembers(groupOpenid)
+          let members = []
+          try {
+            members = await listGroupMembers(groupOpenid)
+          } catch (error) {
+            groupResult.warning = `官方成员列表不可用，改用本地已知成员：${error instanceof Error ? error.message : String(error)}`
+            members = []
+          }
+          if (members.length === 0) {
+            members = localMemberRoster(groupOpenid)
+            if (groupResult.warning.length === 0 && members.length > 0) {
+              groupResult.warning = '官方成员列表为空，改用本地已知成员'
+            }
+          }
           const remove = []
           for (const member of members) {
             const memberOpenid = String(member.member_openid ?? '')
@@ -1469,11 +1481,14 @@ export async function apply(ctx, config) {
             if (member.bot === true || role === 'owner' || role === 'admin') { groupResult.skipped += 1; continue }
             if (isOwnerMember(memberOpenid) || isGroupDelegate(groupOpenid, memberOpenid)) { groupResult.skipped += 1; continue }
             const levelRaw = member.level ?? member.member_level ?? member.group_level
-            const level = Number(levelRaw)
-            if (!Number.isFinite(level)) { groupResult.unknownLevel += 1; continue }
+            let level = Number(levelRaw)
+            if (!Number.isFinite(level)) {
+              // 官方接口不返回等级时，用本地发言次数估算：少于 10 条按 1 级
+              level = (Number(member.local_count) || 0) >= 10 ? 2 : 1
+            }
             if (level >= 2 || level > maxLevel) { groupResult.skipped += 1; continue }
             const activity = state.memberActivity[`${groupOpenid}:${memberOpenid}`]
-            const lastRaw = activity?.lastAt ?? member.joined_at ?? member.joinedAt
+            const lastRaw = activity?.lastAt ?? member.joined_at ?? member.local_last_at
             const lastAt = Date.parse(String(lastRaw ?? ''))
             if (!Number.isFinite(lastAt)) { groupResult.skipped += 1; continue }
             const inactiveDays = (Date.now() - lastAt) / 86_400_000
