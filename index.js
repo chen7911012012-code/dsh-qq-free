@@ -1387,8 +1387,10 @@ export async function apply(ctx, config) {
         await sendText({ scope: 'group', openid: groupOpenid, name: '入群验证' },
           '检测到禁言，禁言结束后首次发言将会触发验证。',
           { kind: 'join-verify', ignoreDailyLimit: true })
+        appendLog({ at: new Date().toISOString(), scope: 'group', openid: groupOpenid, name: '入群验证', text: `${name} 入群时检测到禁言，已提示`, ok: true, kind: 'join-verify' })
       } catch (error) {
         logger.warn(`qq-free: 发送禁言提示失败 ${error instanceof Error ? error.message : String(error)}`)
+        appendLog({ at: new Date().toISOString(), scope: 'group', openid: groupOpenid, name: '入群验证', text: `${name} 禁言提示发送失败`, ok: false, error: error instanceof Error ? error.message : String(error), kind: 'join-verify' })
       }
       return
     }
@@ -1432,8 +1434,10 @@ export async function apply(ctx, config) {
       } else {
         await sendText(target, `验证码：${code}`, { kind: 'join-verify', ignoreDailyLimit: true })
       }
+      appendLog({ at: new Date().toISOString(), scope: 'group', openid: groupOpenid, name: '入群验证', text: `已向 ${name} 发送图片验证码（${minutes} 分钟）`, ok: true, kind: 'join-verify' })
     } catch (error) {
       logger.warn(`qq-free: 发送入群验证码失败 ${error instanceof Error ? error.message : String(error)}`)
+      appendLog({ at: new Date().toISOString(), scope: 'group', openid: groupOpenid, name: '入群验证', text: `${name} 验证码发送失败`, ok: false, error: error instanceof Error ? error.message : String(error), kind: 'join-verify' })
       try {
         await sendText(target, `验证码：${code}`, { kind: 'join-verify', ignoreDailyLimit: true })
       } catch {
