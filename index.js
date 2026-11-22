@@ -1654,22 +1654,22 @@ export async function apply(ctx, config) {
           })
           persistState()
         }
-        return `已添加 ${targetName || targetOpenid} 为代管。`
+        return `已添加 ${targetName || targetOpenid} 为代管${operatorNote(data, targetOpenid)}。`
       }
       const before = state.groupManagers.length
       state.groupManagers = state.groupManagers.filter((item) => !(item.groupOpenid === groupOpenid && item.memberOpenid === targetOpenid))
       if (state.groupManagers.length === before) return `${targetName || targetOpenid} 不是代管。`
       persistState()
-      return `已取消 ${targetName || targetOpenid} 的代管。`
+      return `已取消 ${targetName || targetOpenid} 的代管${operatorNote(data, targetOpenid)}。`
     }
     if (text === '代管列表') {
       if (!manager) return '只有群主、管理员或代管可以查看代管列表。'
       const list = state.groupManagers.filter((item) => item.groupOpenid === groupOpenid)
-      return list.length === 0 ? '当前没有代管。' : `当前代管：\n${list.map((item) => `· ${item.name || item.memberOpenid}`).join('\n')}`
+      return list.length === 0 ? `当前没有代管${operatorNote(data)}。` : `当前代管${operatorNote(data)}：\n${list.map((item) => `· ${item.name || item.memberOpenid}`).join('\n')}`
     }
     if (text === '群信息' || text === '获取群信息') {
       if (!manager) return '只有群主、管理员或代管可以获取群信息。'
-      return groupInfoReply(groupOpenid)
+      return `${await groupInfoReply(groupOpenid)}\n${operatorNote(data)}`
     }
 
     if (!manager) {
@@ -1694,7 +1694,7 @@ export async function apply(ctx, config) {
           at: new Date().toISOString(), scope: 'group', openid: groupOpenid, name: '群管理',
           text: `踢出 ${targetOpenid}`, ok: true, kind: 'group-admin',
         })
-        return `已移出 ${targetOpenid}。`
+        return `已移出 ${targetOpenid}${operatorNote(data, targetOpenid)}。`
       }
       const mute = action === '禁言'
       const minutes = mute ? Math.max(1, Math.min(43200, Number(modMatch[2]) || 60)) : 0
@@ -1711,7 +1711,7 @@ export async function apply(ctx, config) {
         at: new Date().toISOString(), scope: 'group', openid: groupOpenid, name: '群管理',
         text: `${mute ? '禁言' : '解禁'} ${targetOpenid}${mute ? ` ${minutes} 分钟` : ''}`, ok: true, kind: 'group-admin',
       })
-      return mute ? `已禁言 ${targetOpenid} ${minutes} 分钟。` : `已解除 ${targetOpenid} 的禁言。`
+      return mute ? `已禁言 ${targetOpenid} ${minutes} 分钟${operatorNote(data, targetOpenid)}。` : `已解除 ${targetOpenid} 的禁言${operatorNote(data, targetOpenid)}。`
     }
 
     const match = /^(同意|通过|拒绝|不同意)\s*(\S+)?$/u.exec(text)
