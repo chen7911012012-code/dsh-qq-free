@@ -1018,8 +1018,10 @@ export async function apply(ctx, config) {
   }
 
   function recordJoinRequest(data) {
+    const groupOpenid = String(data.group_openid ?? '')
+    if (isGroupFeatureBlocked(groupOpenid, 'joinRequest')) return
     const entry = {
-      groupOpenid: String(data.group_openid ?? ''),
+      groupOpenid,
       memberOpenid: String(data.member_openid ?? ''),
       unionOpenid: String(data.union_openid ?? ''),
       joinRequestId: String(data.join_request_id ?? ''),
@@ -1598,7 +1600,7 @@ export async function apply(ctx, config) {
     })
   }
 
-  const GROUP_FEATURES = ['chat', 'auto', 'welcome', 'joinNotice', 'commands', 'moderation', 'info']
+  const GROUP_FEATURES = ['chat', 'auto', 'welcome', 'joinNotice', 'joinRequest', 'joinVerify', 'commands', 'moderation', 'info']
 
   function getGroupBlock(groupOpenid) {
     return state.groupBlocks.find((item) => item.groupOpenid === groupOpenid) ?? null
