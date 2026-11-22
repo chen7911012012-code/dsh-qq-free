@@ -1989,6 +1989,57 @@ window.__ModuleLoader__.load({
                 : h('p', { className: 'qqf-empty' }, '当前没有待验证的新成员。')),
 
             h(Card, {
+              title: '沉默低等级成员清理',
+              wide: true,
+              hint: '指定群、指定时间清理长时间未发言且群聊等级低于 2 级的成员；群主/管理员/主人/代管不会清理。官方成员列表接口目前是内邀能力，未返回等级时会跳过，不会误踢。',
+            },
+              h('label', { className: 'qqf-row' },
+                h('input', {
+                  type: 'checkbox', checked: cleanupForm?.enabled === true,
+                  onChange: (event) => setCleanupForm({ ...cleanupForm, enabled: event.target.checked }),
+                }),
+                h('span', null, '启用沉默低等级成员清理')),
+              groupTargets.length === 0
+                ? h('p', { className: 'qqf-empty' }, '先添加群聊目标。')
+                : h('div', { className: 'qqf-row' },
+                  groupTargets.map((target) => h('label', { key: target.id, className: 'qqf-row' },
+                    h('input', {
+                      type: 'checkbox', checked: cleanupForm?.groups?.includes(target.openid) === true,
+                      onChange: (event) => setCleanupForm({
+                        ...cleanupForm,
+                        groups: event.target.checked
+                          ? [...new Set([...(cleanupForm?.groups ?? []), target.openid])]
+                          : (cleanupForm?.groups ?? []).filter((item) => item !== target.openid),
+                      }),
+                    }),
+                    h('span', null, target.name)))),
+              h('div', { className: 'qqf-row' },
+                h('label', { className: 'qqf-field' }, h('span', null, '清理时间'),
+                  h('input', {
+                    className: 'qqf-input', type: 'time', value: cleanupForm?.time ?? '03:00',
+                    onChange: (event) => setCleanupForm({ ...cleanupForm, time: event.target.value }),
+                  })),
+                h('label', { className: 'qqf-field' }, h('span', null, '超过多少天未发言'),
+                  h('input', {
+                    className: 'qqf-input', type: 'number', min: 1, max: 3650, value: cleanupForm?.days ?? 30,
+                    onChange: (event) => setCleanupForm({ ...cleanupForm, days: event.target.value }),
+                  })),
+                h('label', { className: 'qqf-field' }, h('span', null, '清理等级低于'),
+                  h('input', {
+                    className: 'qqf-input', type: 'number', min: 0, max: 100, value: cleanupForm?.maxLevel ?? 1,
+                    onChange: (event) => setCleanupForm({ ...cleanupForm, maxLevel: event.target.value }),
+                  }))),
+              h('div', { className: 'qqf-row' },
+                h('button', { className: 'qqf-btn', disabled: busy !== '', onClick: () => void saveCleanup() },
+                  busy === 'cleanup' ? '保存中…' : '保存清理设置'),
+                h('button', { className: 'qqf-btn qqf-btn--ghost', disabled: busy !== '', onClick: () => void runCleanup() },
+                  busy === 'cleanup-run' ? '检查中…' : '立即检查')),
+              data.inactiveCleanup?.lastResult
+                ? h('pre', { className: 'qqf-mono', style: { whiteSpace: 'pre-wrap' } },
+                  (data.inactiveCleanup.lastResult.groups ?? []).map((item) => `${item.name || item.groupOpenid}：清理 ${item.removed}，跳过 ${item.skipped}，无等级 ${item.unknownLevel}${item.error ? `，错误 ${item.error}` : ''}`).join('\n'))
+                : null),
+
+            h(Card, {
               title: '群功能屏蔽',
               wide: true,
               hint: '按群屏蔽指定功能，或一键屏蔽全部功能。全部屏蔽后该群的聊天、自动发言、命令、违禁词、欢迎、入群通知、获取信息都不再响应。',
