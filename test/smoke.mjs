@@ -634,6 +634,8 @@ if (ws) {
   const mutedNotice = sent.slice(beforeMuted).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && JSON.stringify(item.body).includes('检测到禁言'))
   check('全体禁言时提示禁言结束首次发言验证', Boolean(mutedNotice) && !sent.slice(beforeMuted).some((item) => item.target.includes('/files')))
   groupMuted = false
+  await sleep(200)
+  check('禁言结束未发言时不发验证码', !sent.slice(beforeMuted).some((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && JSON.stringify(item.body).includes('5 分钟')))
   ws.emit({ op: 0, s: 30, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-DEFER', content: '在吗', group_openid: GROUP, mentions: [], author: { member_openid: 'DEFER001', member_nickname: '禁言新人', member_role: 'member' } } })
   await sleep(150)
   const deferredChallenge = sent.slice(beforeMuted).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && JSON.stringify(item.body).includes('5 分钟') && JSON.stringify(item.body).includes('DEFER001'))
