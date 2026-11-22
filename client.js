@@ -2077,6 +2077,60 @@ window.__ModuleLoader__.load({
                 : null),
 
             h(Card, {
+              title: '分群网页与权限',
+              wide: true,
+              hint: '每个群生成独立网页，只操作本群；可设置有效期和「机器人发言」权限。权限关闭后，分群网页点击发言会提示「你无权限」。主网页不受这里限制。',
+            },
+              h('div', { className: 'qqf-row' },
+                h('select', {
+                  className: 'qqf-select qqf-grow', value: gpForm.groupOpenid,
+                  onChange: (event) => setGpForm({ ...gpForm, groupOpenid: event.target.value }),
+                },
+                  h('option', { value: '' }, '选择群聊…'),
+                  groupTargets.map((target) => h('option', { key: target.id, value: target.openid }, target.name))),
+                h('label', { className: 'qqf-field' }, h('span', null, '有效期至'),
+                  h('input', {
+                    className: 'qqf-input', type: 'datetime-local', value: gpForm.expiresAt,
+                    onChange: (event) => setGpForm({ ...gpForm, expiresAt: event.target.value }),
+                  })),
+                h('label', { className: 'qqf-row' },
+                  h('input', {
+                    type: 'checkbox', checked: gpForm.say,
+                    onChange: (event) => setGpForm({ ...gpForm, say: event.target.checked }),
+                  }),
+                  h('span', null, '允许机器人发言')),
+                h('button', {
+                  className: 'qqf-btn', disabled: busy !== '' || gpForm.groupOpenid === '',
+                  onClick: () => void saveGroupPage(),
+                }, busy === 'group-page' ? '保存中…' : '生成 / 更新')),
+              data.groupPages && data.groupPages.length > 0
+                ? h('ul', { className: 'qqf-targets' },
+                  data.groupPages.map((entry) => {
+                    const base = String(data.remote?.tunnel?.url || '').replace(/\/+$/, '')
+                    const url = base.length > 0 ? `${base}/g/${entry.token}` : `/g/${entry.token}`
+                    return h('li', { key: entry.groupOpenid, className: 'qqf-target' },
+                      h('div', { className: 'qqf-target-main' },
+                        h('span', { className: 'qqf-target-name' }, `${entry.groupName || entry.groupOpenid} · ${entry.permissions?.say ? '可发言' : '只读'}`),
+                        h('span', { className: 'qqf-mono' }, entry.expiresAt ? `有效期至 ${new Date(entry.expiresAt).toLocaleString('zh-CN', { hour12: false })}` : '长期有效'),
+                        h('span', { className: 'qqf-mono' }, url)),
+                      h('div', { className: 'qqf-row' },
+                        h('button', { className: 'qqf-btn qqf-btn--sm', disabled: busy !== '', onClick: () => void copyText(url) }, '复制链接'),
+                        h('button', {
+                          className: 'qqf-btn qqf-btn--sm qqf-btn--ghost', disabled: busy !== '',
+                          onClick: () => void saveGroupPage({
+                            groupOpenid: entry.groupOpenid,
+                            expiresAt: entry.expiresAt ? new Date(entry.expiresAt).toISOString() : '',
+                            say: !entry.permissions?.say,
+                          }),
+                        }, entry.permissions?.say ? '关闭发言' : '开启发言'),
+                        h('button', {
+                          className: 'qqf-btn qqf-btn--sm qqf-btn--danger', disabled: busy !== '',
+                          onClick: () => void removeGroupPage(entry),
+                        }, '删除')))
+                  }))
+                : h('p', { className: 'qqf-empty' }, '还没有分群网页。')),
+
+            h(Card, {
               title: '群功能屏蔽',
               wide: true,
               hint: '按群屏蔽指定功能，或一键屏蔽全部功能。全部屏蔽后该群的聊天、自动发言、命令、违禁词、欢迎、入群通知、获取信息都不再响应。',
