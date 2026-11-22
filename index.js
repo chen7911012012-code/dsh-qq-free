@@ -187,9 +187,6 @@ function pickConfig(input) {
     } else if (key === 'inactiveCleanupGroups') {
       const list = Array.isArray(value) ? value : String(value).split(/[\n,，、\s]+/)
       out[key] = list.map((item) => String(item).trim()).filter(Boolean).slice(0, 30)
-    } else if (key === 'checkinGroups') {
-      const list = Array.isArray(value) ? value : String(value).split(/[\n,，、\s]+/)
-      out[key] = list.map((item) => String(item).trim()).filter(Boolean).slice(0, 30)
     } else if (key === 'fortuneGroups') {
       const list = Array.isArray(value) ? value : String(value).split(/[\n,，、\s]+/)
       out[key] = list.map((item) => String(item).trim()).filter(Boolean).slice(0, 30)
@@ -206,8 +203,6 @@ function pickConfig(input) {
     } else if (key === 'joinVerifyEnabled') {
       out[key] = value === true || value === 'true'
     } else if (key === 'inactiveCleanupEnabled') {
-      out[key] = value === true || value === 'true'
-    } else if (key === 'checkinEnabled') {
       out[key] = value === true || value === 'true'
     } else if (key === 'fortuneEnabled') {
       out[key] = value === true || value === 'true'
@@ -361,7 +356,6 @@ export async function apply(ctx, config) {
   state.groupPages = Array.isArray(state.groupPages)
     ? state.groupPages.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.token === 'string').slice(-100)
     : []
-  state.checkins = state.checkins !== null && typeof state.checkins === 'object' ? state.checkins : {}
   state.fortunes = state.fortunes !== null && typeof state.fortunes === 'object' ? state.fortunes : {}
 
   // 只保留今天的配额计数
@@ -1547,44 +1541,76 @@ export async function apply(ctx, config) {
     '中吉：旧问题会出现转机，别放弃。',
   ]
 
-  function checkinDateKey(date = new Date()) {
+  function dayKey(date = new Date()) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
   }
 
-  function handleCheckin(data) {
+  async function fetchFortuneImage(groupOpenid, memberOpenid, date) {
+    const response = await fetch('https://nekos.best/api/v2/neko', { signal: AbortSignal.timeout(20_000) })
+    if (!response.ok) throw new Error(`图片接口 HTTP ${response.status}`)
+    const data = await response.json()
+    const url = String(data?.results?.[0]?.url ?? '')
+    if (!/^https?:\/\//i.test(url)) throw new Error('图片接口没有返回图片地址')
+    const image = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+    if (!image.ok) throw new Error(`图片下载 HTTP ${image.status}`)
+    const buffer = Buffer.from(await image.arrayBuffer())
+    if (buffer.length === 0 || buffer.length > 10 * 1024 * 1024) throw new Error('图片大小异常')
+    const type = String(image.headers.get('content-type') ?? '')
+    const ext = type.includes('png') ? 'png' : type.includes('webp') ? 'webp' : 'jpg'
+    const dir = join(DATA_DIR, 'fortune')
+    mkdirSync(dir, { recursive: true })
+    const file = join(dir, `${groupOpenid}-${memberOpenid}-${date}.${ext}`)
+    writeFileSync(file, buffer)
+    return file
+  }
+
+  async function handleFortune(data) {
     const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
     const memberOpenid = String(data.author?.member_openid ?? '')
     if (groupOpenid.length === 0 || memberOpenid.length === 0) return null
     const text = String(data.content ?? '').replace(/<@!?[^>]+>/g, '').replace(/\s+/g, ' ').trim()
-    if (!/^(签到|打卡)$/.test(text)) return null
-    if (isGroupAllBlocked(groupOpenid) || isGroupFeatureBlocked(groupOpenid, 'checkin')) return '本群已关闭签到功能。'
-    if (liveConfig.checkinEnabled !== true) return '签到功能未开启。'
-    const groups = Array.isArray(liveConfig.checkinGroups) ? liveConfig.checkinGroups : []
-    if (groups.length > 0 && !groups.includes(groupOpenid)) return '本群未开启签到。'
-    const today = checkinDateKey()
+    if (!/^(今日运势|今日运程|抽运势)$/.test(text)) return null
+    if (isGroupAllBlocked(groupOpenid) || isGroupFeatureBlocked(groupOpenid, 'fortune')) return '本群已关闭今日运势。'
+    if (liveConfig.fortuneEnabled !== true) return '今日运势功能未开启。'
+    const groups = Array.isArray(liveConfig.fortuneGroups) ? liveConfig.fortuneGroups : []
+    if (groups.length > 0 && !groups.includes(groupOpenid)) return '本群未开启今日运势。'
+    const today = dayKey()
     const key = `${groupOpenid}:${memberOpenid}`
-    const name = String(data.author?.member_nickname ?? data.author?.username ?? '').slice(0, 60)
-    const existing = state.checkins[key]
-    if (existing && existing.lastDate === today) {
-      return `今天已经签到过了。累计签到 ${Number(existing.count) || 0} 次，积分 ${Number(existing.points) || 0}。今日运势：${existing.lastFortune || '平'}`
+    const existing = state.fortunes[key]
+    const target = { scope: 'group', openid: groupOpenid, name: '今日运势' }
+    if (existing && existing.date === today) {
+      if (existing.imagePath && existsSync(existing.imagePath)) {
+        try {
+          await sendMedia(target, { type: 1, path: existing.imagePath, kind: 'fortune', ignoreDailyLimit: true })
+        } catch (error) {
+          logger.warn(`qq-free: 重复发送运势图片失败 ${error instanceof Error ? error.message : String(error)}`)
+        }
+      }
+      return `你今日已经抽过了。\n上次运势：${existing.fortune}`
     }
-    const points = Math.floor(10 + Math.random() * 31)
     const fortune = FORTUNES[Math.floor(Math.random() * FORTUNES.length)]
-    const count = (Number(existing?.count) || 0) + 1
+    let imagePath = ''
+    if (liveConfig.fortuneImageEnabled !== false) {
+      try {
+        imagePath = await fetchFortuneImage(groupOpenid, memberOpenid, today)
+        await sendMedia(target, { type: 1, path: imagePath, kind: 'fortune', ignoreDailyLimit: true })
+      } catch (error) {
+        logger.warn(`qq-free: 获取运势二次元图片失败 ${error instanceof Error ? error.message : String(error)}`)
+        imagePath = ''
+      }
+    }
     const entry = {
       groupOpenid,
       memberOpenid,
-      name: name || existing?.name || '',
-      count,
-      points: (Number(existing?.points) || 0) + points,
-      lastDate: today,
-      lastFortune: fortune,
+      name: String(data.author?.member_nickname ?? data.author?.username ?? '').slice(0, 60),
+      date: today,
+      fortune,
+      imagePath,
       updatedAt: new Date().toISOString(),
-      history: [...(Array.isArray(existing?.history) ? existing.history : []), { date: today, points, fortune }].slice(-60),
     }
-    state.checkins[key] = entry
+    state.fortunes[key] = entry
     persistState()
-    return `签到成功！获得 ${points} 积分。\n今日运势：${fortune}\n累计签到 ${count} 次，总积分 ${entry.points}。`
+    return `今日运势：${fortune}\n（每天只能抽一次，0 点刷新）`
   }
 
   async function handleGroupCommand(data) {
@@ -3125,13 +3151,13 @@ export async function apply(ctx, config) {
         ...item,
         groupName: state.targets.find((target) => target.scope === 'group' && target.openid === item.groupOpenid)?.name ?? '',
       })),
-      checkin: {
-        enabled: liveConfig.checkinEnabled === true,
-        groups: Array.isArray(liveConfig.checkinGroups) ? liveConfig.checkinGroups : [],
+      fortune: {
+        enabled: liveConfig.fortuneEnabled === true,
+        groups: Array.isArray(liveConfig.fortuneGroups) ? liveConfig.fortuneGroups : [],
       },
-      checkins: Object.values(state.checkins)
+      fortunes: Object.values(state.fortunes)
         .filter((item) => item && typeof item.memberOpenid === 'string')
-        .sort((left, right) => (Number(right.count) || 0) - (Number(left.count) || 0) || (Number(right.points) || 0) - (Number(left.points) || 0))
+        .sort((left, right) => String(right.date ?? '').localeCompare(String(left.date ?? '')))
         .slice(0, 100),
       joinVerifications: state.joinVerifications.map((item) => ({ groupOpenid: item.groupOpenid, memberOpenid: item.memberOpenid, name: item.name, expiresAt: item.expiresAt })),
       joinVerify: {
