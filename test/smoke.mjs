@@ -201,7 +201,7 @@ await module.apply(ctx, {
   quietHoursStart: '23:00',
   quietHoursEnd: '08:00',
 })
-check('注册了 26 条 HTTP 路由', routes.size === 26, [...routes.keys()].join(', '))
+check('注册了 28 条 HTTP 路由', routes.size === 28, [...routes.keys()].join(', '))
 check('注册了 3 个工具', tools.length === 3)
 const qaGuidance = sections.find((section) => section.name === 'qq-free:qa-guidance')
 const qaLibrary = sections.find((section) => section.name === 'qq-free:qa-library')
@@ -645,6 +645,27 @@ const remoteSend = await httpCall(`${remoteBase}/api/send`, {
   body: { targetId, text: '远程网页发送测试' },
 })
 check('远程网页可发言', remoteSend.status === 200 && remoteSend.json().ok === true)
+
+result = await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: false, expiresAt: '' })
+const groupToken = result.body.state.groupPages[0]?.token
+check('生成分群网页', result.status === 200 && typeof groupToken === 'string' && groupToken.length > 10)
+const gpState = await httpCall(`${remoteBase}/gapi/state?token=${encodeURIComponent(groupToken)}`)
+check('分群网页状态可读', gpState.status === 200 && gpState.json().permissions?.say === false)
+const gpDenied = await httpCall(`${remoteBase}/gapi/say?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { text: '越权发言' },
+})
+check('分群无发言权限提示你无权限', gpDenied.status === 403 && gpDenied.json().error === '你无权限')
+await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: true, expiresAt: '' })
+const gpAllowed = await httpCall(`${remoteBase}/gapi/say?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { text: '分群网页发言测试' },
+})
+check('分群有权限可发言', gpAllowed.status === 200 && gpAllowed.json().ok === true)
+const mainStill = await httpCall(`${remoteBase}/api/state`, { headers: { authorization: 'Bearer test-token' } })
+check('主网页不受分群权限限制', mainStill.status === 200)
+await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: true, expiresAt: '2020-01-01T00:00:00.000Z' })
+const gpExpired = await httpCall(`${remoteBase}/g/${encodeURIComponent(groupToken)}`)
+check('分群网页过期', gpExpired.status === 410)
+await call('/qq-free/group-pages', 'POST', { action: 'remove', groupOpenid: GROUP })
 result = await call('/qq-free/remote', 'POST', { enabled: false })
 check('停止远程网页', result.status === 200 && result.body.state.remote.running === false)
 
