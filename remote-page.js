@@ -359,7 +359,16 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
     })
 
     var joins = $('joinList'); joins.innerHTML = ''
-    ;(state.pendingJoins || []).forEach(function (entry) {      var memberId = entry.member_openid || entry.memberOpenid || ''
+    var checkinList = $('checkinList'); checkinList.innerHTML = ''
+    ;(state.checkins || []).slice(0, 20).forEach(function (entry) {
+      var div = document.createElement('div'); div.className = 'item'
+      var main = document.createElement('div'); main.className = 'item-main'
+      var name = document.createElement('div'); name.className = 'q'; name.textContent = (entry.name || entry.memberOpenid) + ' · ' + entry.count + ' 次 · ' + entry.points + ' 积分'
+      var fortune = document.createElement('div'); fortune.className = 'a'; fortune.textContent = entry.lastFortune || ''
+      main.appendChild(name); main.appendChild(fortune); div.appendChild(main); checkinList.appendChild(div)
+    })
+    ;(state.pendingJoins || []).forEach(function (entry) {
+      var memberId = entry.member_openid || entry.memberOpenid || ''
       var groupId = entry.group_openid || entry.groupOpenid || ''
       var applyAt = entry.apply_at || entry.applyAt || ''
       var div = document.createElement('div'); div.className = 'item'
