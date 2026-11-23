@@ -1025,12 +1025,15 @@ export async function apply(ctx, config) {
 
   async function desktopAgentReply(question) {
     const agents = ctx.get('agents')
-    if (!agents || typeof agents.get !== 'function') {
+    if (!agents || typeof agents.list !== 'function') {
       throw new Error('当前 profile 没有可用的 agents 服务')
     }
-    const agent = agents.get(process.env.DSH_SESSION_ID)
+    const agent = agents.list().find((item) => {
+      const cwd = String(item?.session?.meta?.cwd ?? '')
+      return cwd.endsWith('qq对话') || cwd.endsWith('QQ对话') || cwd.includes('qq对话') || cwd.includes('QQ对话')
+    })
     if (!agent || typeof agent.followup !== 'function' || typeof agent.whenIdle !== 'function') {
-      throw new Error('没有找到工作区 QQ 对话 agent')
+      throw new Error('QQ 对话工作区没有打开的会话')
     }
     const session = agent.session
     const beforeSeq = Number(session?.seq) || 0
@@ -1044,7 +1047,7 @@ export async function apply(ctx, config) {
     await new Promise((resolve) => setTimeout(resolve, 60))
     await Promise.race([
       agent.whenIdle(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('工作区 QQ 对话超时')), 120_000)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('QQ 对话工作区超时')), 120_000)),
     ])
     const events = session?.snapshotEvents?.() ?? []
     for (let index = events.length - 1; index >= 0; index -= 1) {
