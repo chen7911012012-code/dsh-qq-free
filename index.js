@@ -1071,9 +1071,10 @@ export async function apply(ctx, config) {
     if (!agents || typeof agents.list !== 'function') {
       throw new Error('当前 profile 没有可用的 agents 服务')
     }
+    const qqWorkspace = join(process.env.USERPROFILE || homedir(), 'Desktop', 'qq对话')
     const isQqWorkspace = (cwdValue) => {
       const cwd = String(cwdValue ?? '')
-      return cwd.endsWith('qq对话') || cwd.endsWith('QQ对话') || cwd.includes('qq对话') || cwd.includes('QQ对话')
+      return cwd === qqWorkspace || cwd.endsWith('qq对话') || cwd.endsWith('QQ对话') || cwd.includes('qq对话') || cwd.includes('QQ对话')
     }
     let handle = null
     let agent = agents.list().find((item) => isQqWorkspace(item?.session?.meta?.cwd))
@@ -1084,6 +1085,16 @@ export async function apply(ctx, config) {
         handle = await agents.resume({ sessionId: target.id })
         agent = handle.agent
       }
+    }
+    if (!agent && typeof agents.create === 'function') {
+      const current = agents.get?.(process.env.DSH_SESSION_ID)
+      const selected = current?.model?.current?.()
+      handle = await agents.create({
+        sessionId: `session-qq-${Date.now().toString(36)}`,
+        meta: { cwd: qqWorkspace, agentPreset: 'standard' },
+        ...(selected ? { agentOptions: { provider: selected.provider, model: selected.model } } : {}),
+      })
+      agent = handle.agent
     }
     if (!agent || typeof agent.followup !== 'function' || typeof agent.whenIdle !== 'function') {
       throw new Error('QQ 对话工作区没有打开的会话')
