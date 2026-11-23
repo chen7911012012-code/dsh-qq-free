@@ -1028,52 +1028,66 @@ export async function apply(ctx, config) {
     if (!agents || typeof agents.list !== 'function') {
       throw new Error('当前 profile 没有可用的 agents 服务')
     }
-    const agent = agents.list().find((item) => {
-      const cwd = String(item?.session?.meta?.cwd ?? '')
+    const isQqWorkspace = (cwdValue) => {
+      const cwd = String(cwdValue ?? '')
       return cwd.endsWith('qq对话') || cwd.endsWith('QQ对话') || cwd.includes('qq对话') || cwd.includes('QQ对话')
-    })
+    }
+    let handle = null
+    let agent = agents.list().find((item) => isQqWorkspace(item?.session?.meta?.cwd))
+    if (!agent) {
+      const sessions = ctx.get('sessions')
+      const target = sessions?.list?.().find((item) => isQqWorkspace(item?.meta?.cwd))
+      if (target && typeof agents.resume === 'function') {
+        handle = await agents.resume({ sessionId: target.id })
+        agent = handle.agent
+      }
+    }
     if (!agent || typeof agent.followup !== 'function' || typeof agent.whenIdle !== 'function') {
       throw new Error('QQ 对话工作区没有打开的会话')
     }
-    const session = agent.session
-    const beforeSeq = Number(session?.seq) || 0
-    agent.followup({
-      content: [{
-        type: 'text',
-        text: `[QQ 群问题] ${question}\n\n请直接回答这个问题，只输出要发回 QQ 的最终回答，不要写分析过程。`,
-      }],
-      source: { kind: 'user' },
-    })
-    await new Promise((resolve) => setTimeout(resolve, 60))
-    await Promise.race([
-      agent.whenIdle(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('QQ 对话工作区超时')), 120_000)),
-    ])
-    const events = session?.snapshotEvents?.() ?? []
-    for (let index = events.length - 1; index >= 0; index -= 1) {
-      const event = events[index]
-      if (!event || Number(event.seq) <= beforeSeq || event.type !== 'assistant/message') continue
-      const data = event.data ?? {}
-      const content = Array.isArray(data.content) ? data.content : Array.isArray(data.message?.content) ? data.message.content : []
-      const text = content
-        .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
-        .map((part) => part.text)
-        .join('')
-        .trim()
-      if (text.length > 0) return text
+    try {
+      const session = agent.session
+      const beforeSeq = Number(session?.seq) || 0
+      agent.followup({
+        content: [{
+          type: 'text',
+          text: `[QQ 群问题] ${question}\n\n请直接回答这个问题，只输出要发回 QQ 的最终回答，不要写分析过程。`,
+        }],
+        source: { kind: 'user' },
+      })
+      await new Promise((resolve) => setTimeout(resolve, 60))
+      await Promise.race([
+        agent.whenIdle(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('QQ 对话工作区超时')), 120_000)),
+      ])
+      const events = session?.snapshotEvents?.() ?? []
+      for (let index = events.length - 1; index >= 0; index -= 1) {
+        const event = events[index]
+        if (!event || Number(event.seq) <= beforeSeq || event.type !== 'assistant/message') continue
+        const data = event.data ?? {}
+        const content = Array.isArray(data.content) ? data.content : Array.isArray(data.message?.content) ? data.message.content : []
+        const text = content
+          .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
+          .map((part) => part.text)
+          .join('')
+          .trim()
+        if (text.length > 0) return text
+      }
+      const messages = session?.deriveMessages?.() ?? []
+      for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index]
+        if (!message || message.role !== 'assistant') continue
+        const text = (Array.isArray(message.content) ? message.content : [])
+          .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
+          .map((part) => part.text)
+          .join('')
+          .trim()
+        if (text.length > 0) return text
+      }
+      throw new Error('工作区 QQ 对话没有返回文本')
+    } finally {
+      if (handle !== null) await handle.dispose().catch(() => {})
     }
-    const messages = session?.deriveMessages?.() ?? []
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const message = messages[index]
-      if (!message || message.role !== 'assistant') continue
-      const text = (Array.isArray(message.content) ? message.content : [])
-        .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
-        .map((part) => part.text)
-        .join('')
-        .trim()
-      if (text.length > 0) return text
-    }
-    throw new Error('工作区 QQ 对话没有返回文本')
   }
 
   /** 先用一个小模型调用判断：这句话是在提问/求助，还是纯闲聊。 */
