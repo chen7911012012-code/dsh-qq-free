@@ -1025,57 +1025,52 @@ export async function apply(ctx, config) {
 
   async function desktopAgentReply(question) {
     const agents = ctx.get('agents')
-    if (!agents || typeof agents.create !== 'function') {
+    if (!agents || typeof agents.get !== 'function') {
       throw new Error('当前 profile 没有可用的 agents 服务')
     }
-    const sessionId = `qq-desktop-${randomUUID()}`
-    let provider = String(liveConfig.provider || 'deepseek-account')
-    let model = String(liveConfig.model || 'deepseek-flash')
-    try {
-      const desktopAgent = agents.get?.(process.env.DSH_SESSION_ID)
-      const selected = desktopAgent?.model?.current?.()
-      if (selected && selected.provider && selected.model) {
-        provider = selected.provider
-        model = selected.model
-      }
-    } catch {
-      // 取不到桌面会话路由时用插件配置
+    const agent = agents.get(process.env.DSH_SESSION_ID)
+    if (!agent || typeof agent.followup !== 'function' || typeof agent.whenIdle !== 'function') {
+      throw new Error('没有找到工作区 QQ 对话 agent')
     }
-    const handle = await agents.create({
-      sessionId,
-      meta: {
-        cwd: String(liveConfig.desktopWorkspace || '').trim() || process.cwd(),
-      },
-      agentOptions: { provider, model },
+    const session = agent.session
+    const beforeSeq = Number(session?.seq) || 0
+    agent.followup({
+      content: [{
+        type: 'text',
+        text: `[QQ 群问题] ${question}\n\n请直接回答这个问题，只输出要发回 QQ 的最终回答，不要写分析过程。`,
+      }],
+      source: { kind: 'user' },
     })
-    try {
-      handle.agent.followup({
-        content: [{
-          type: 'text',
-          text: `你是运行在 DSH 桌面工作区的助手。请回答下面这个 QQ 群里的问题，只输出给提问者的最终回答，不要解释过程。\n\n问题：${question}`,
-        }],
-        source: { kind: 'user' },
-      })
-      await new Promise((resolve) => setTimeout(resolve, 80))
-      await handle.agent.whenIdle()
-      const messages = handle.agent.session?.deriveMessages?.() ?? []
-      for (let index = messages.length - 1; index >= 0; index -= 1) {
-        const message = messages[index]
-        if (!message || message.role !== 'assistant') continue
-        const text = (Array.isArray(message.content) ? message.content : [])
-          .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
-          .map((part) => part.text)
-          .join('')
-          .trim()
-        if (text.length > 0) return text
-      }
-      const events = handle.agent.session?.snapshotEvents?.() ?? []
-      const types = events.map((event) => event?.type).filter(Boolean)
-      const lastAttempt = [...events].reverse().find((event) => event?.type === 'assistant/attempt')
-      throw new Error(`桌面工作区没有返回文本（provider=${provider}，model=${model}，events=${events.length}，types=${types.slice(-8).join(',')}，attempt=${JSON.stringify(lastAttempt?.data ?? null).slice(0, 500)}）`)
-    } finally {
-      await handle.dispose().catch(() => {})
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    await Promise.race([
+      agent.whenIdle(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('工作区 QQ 对话超时')), 120_000)),
+    ])
+    const events = session?.snapshotEvents?.() ?? []
+    for (let index = events.length - 1; index >= 0; index -= 1) {
+      const event = events[index]
+      if (!event || Number(event.seq) <= beforeSeq || event.type !== 'assistant/message') continue
+      const data = event.data ?? {}
+      const content = Array.isArray(data.content) ? data.content : Array.isArray(data.message?.content) ? data.message.content : []
+      const text = content
+        .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
+        .map((part) => part.text)
+        .join('')
+        .trim()
+      if (text.length > 0) return text
     }
+    const messages = session?.deriveMessages?.() ?? []
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index]
+      if (!message || message.role !== 'assistant') continue
+      const text = (Array.isArray(message.content) ? message.content : [])
+        .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
+        .map((part) => part.text)
+        .join('')
+        .trim()
+      if (text.length > 0) return text
+    }
+    throw new Error('工作区 QQ 对话没有返回文本')
   }
 
   /** 先用一个小模型调用判断：这句话是在提问/求助，还是纯闲聊。 */
