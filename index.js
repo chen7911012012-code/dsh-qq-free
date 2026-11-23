@@ -14,7 +14,7 @@
  * @module @local/dsh-qq-free
  */
 
-import { randomBytes, randomInt, randomUUID } from 'node:crypto'
+import { randomInt } from 'node:crypto'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, networkInterfaces } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
@@ -379,6 +379,25 @@ export async function apply(ctx, config) {
     ? state.groupPages.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.token === 'string').slice(-100)
     : []
   state.fortunes = state.fortunes !== null && typeof state.fortunes === 'object' ? state.fortunes : {}
+
+  // 网页密码统一为 6 位，主网页和分群网页互不重复
+  const usedWebPasswords = new Set()
+  if (!isWebPassword(liveConfig.webToken)) {
+    const generated = uniqueWebPassword(usedWebPasswords)
+    usedWebPasswords.add(generated)
+    saveConfigPatch({ webToken: generated })
+  } else {
+    usedWebPasswords.add(liveConfig.webToken)
+  }
+  let groupPagesChanged = false
+  for (const page of state.groupPages) {
+    if (!isWebPassword(page.token) || usedWebPasswords.has(page.token)) {
+      page.token = uniqueWebPassword(usedWebPasswords)
+      groupPagesChanged = true
+    }
+    usedWebPasswords.add(page.token)
+  }
+  if (groupPagesChanged) persistState()
 
   // 只保留今天的配额计数
   const today = todayKey()
