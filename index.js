@@ -1046,6 +1046,7 @@ export async function apply(ctx, config) {
         }],
         source: { kind: 'user' },
       })
+      await new Promise((resolve) => setTimeout(resolve, 80))
       await handle.agent.whenIdle()
       const messages = handle.agent.session?.deriveMessages?.() ?? []
       for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -1058,7 +1059,9 @@ export async function apply(ctx, config) {
           .trim()
         if (text.length > 0) return text
       }
-      throw new Error('桌面工作区没有返回文本')
+      const events = handle.agent.session?.snapshotEvents?.() ?? []
+      const types = events.map((event) => event?.type).filter(Boolean)
+      throw new Error(`桌面工作区没有返回文本（events=${events.length}，types=${types.slice(-8).join(',')}）`)
     } finally {
       await handle.dispose().catch(() => {})
     }
