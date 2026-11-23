@@ -168,7 +168,7 @@ export function createTunnel({ dataDir, getConfig, logger }) {
     }
     lastError = ''
     try {
-      child = spawn(binary, ['tunnel', '--url', 'http://127.0.0.1:8788', '--no-autoupdate', '--logfile', logFile()], {
+      child = spawn(binary, ['tunnel', '--url', 'http://127.0.0.1:8788', '--protocol', 'http2', '--no-prechecks', '--no-autoupdate', '--logfile', logFile()], {
         windowsHide: true,
         stdio: 'ignore',
       })
