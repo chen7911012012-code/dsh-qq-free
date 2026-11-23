@@ -1360,6 +1360,7 @@ export async function apply(ctx, config) {
   }
 
   async function kickUnverified(entry, notice) {
+    if (entry.deferred === true) return
     clearVerification(entry)
     try {
       await groupApi('POST', `/v2/groups/${encodeURIComponent(entry.groupOpenid)}/batch_remove_members`, { member_openids: [entry.memberOpenid] })
@@ -1376,10 +1377,14 @@ export async function apply(ctx, config) {
   }
 
   function scheduleVerification(entry) {
+    // 禁言期间进来的成员没有验证码和到期时间，绝不能被定时踢出
+    if (entry.deferred === true) return
+    const expiresAt = Number(entry.expiresAt)
+    if (!Number.isFinite(expiresAt) || expiresAt <= 0) return
     const key = verificationKey(entry.groupOpenid, entry.memberOpenid)
     const existing = verificationTimers.get(key)
     if (existing !== undefined) clearTimeout(existing)
-    const delay = Math.max(0, Number(entry.expiresAt) - Date.now())
+    const delay = Math.max(0, expiresAt - Date.now())
     const timer = setTimeout(() => {
       void kickUnverified(entry, `${entry.name || entry.memberOpenid} 未在 ${Number(entry.minutes) || 2} 分钟内完成验证，已被移出群聊。`)
     }, delay)
@@ -3004,6 +3009,7 @@ export async function apply(ctx, config) {
 
   ctx.effect(() => {
     for (const entry of [...state.joinVerifications]) {
+      if (entry.deferred === true) continue
       if (Date.now() > Number(entry.expiresAt)) {
         void kickUnverified(entry, `${entry.name || entry.memberOpenid} 未在 ${Number(entry.minutes) || 2} 分钟内完成验证，已被移出群聊。`)
       } else {
