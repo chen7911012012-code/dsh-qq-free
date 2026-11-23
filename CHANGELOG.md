@@ -1,5 +1,10 @@
 # 更新日志 / Changelog
 
+## 1.35.2
+
+- 公网隧道改用 HTTP/2 并跳过会误报硬失败的 precheck，避免 Cloudflare region2 被墙时主网页完全打不开。
+- 隧道启动更可靠，仍保持自动复用/自动重启。
+
 ## 1.35.1
 
 - QQ 问题优先交给「QQ 对话工作区」中 `standard` 预设的 DSH agent，带完整工具与文件读写能力。
