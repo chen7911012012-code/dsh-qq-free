@@ -14,7 +14,7 @@
  * @module @local/dsh-qq-free
  */
 
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, networkInterfaces } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
@@ -2433,6 +2433,13 @@ export async function apply(ctx, config) {
       const prompt = isChat && transcript.length > 0
         ? `以下是这段 QQ 对话的历史：\n${transcript}\n用户：${question}\n${instruction}`
         : `${question}\n${instruction}`
+      if (!isChat) {
+        try {
+          return await desktopAgentReply(question)
+        } catch (error) {
+          logger.warn(`qq-free: 桌面工作区回答失败，回退普通模型: ${error instanceof Error ? error.message : String(error)}`)
+        }
+      }
       return generateText({ system, prompt, maxTokens: 600 })
     },
     onReply: (entry) => recordChatReply(entry),
