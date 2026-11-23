@@ -1029,8 +1029,18 @@ export async function apply(ctx, config) {
       throw new Error('当前 profile 没有可用的 agents 服务')
     }
     const sessionId = `qq-desktop-${randomUUID()}`
-    const provider = String(liveConfig.provider || 'deepseek-account')
-    const model = String(liveConfig.model || 'deepseek-flash')
+    let provider = String(liveConfig.provider || 'deepseek-account')
+    let model = String(liveConfig.model || 'deepseek-flash')
+    try {
+      const desktopAgent = agents.get?.(process.env.DSH_SESSION_ID)
+      const selected = desktopAgent?.model?.current?.()
+      if (selected && selected.provider && selected.model) {
+        provider = selected.provider
+        model = selected.model
+      }
+    } catch {
+      // 取不到桌面会话路由时用插件配置
+    }
     const handle = await agents.create({
       sessionId,
       meta: {
