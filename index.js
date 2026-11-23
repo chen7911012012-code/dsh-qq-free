@@ -1023,6 +1023,47 @@ export async function apply(ctx, config) {
 
   const DEFAULT_CHAT_AGENT_PERSONA = '你是一个群聊里的智能体助手，像真人一样自然接话：简短、口语化、有自己的判断，不端着，不机械列点；聊闲天时轻松一点，别长篇大论，也不要主动暴露自己是模型。'
 
+  async function desktopAgentReply(question) {
+    const agents = ctx.get('agents')
+    if (!agents || typeof agents.create !== 'function') {
+      throw new Error('当前 profile 没有可用的 agents 服务')
+    }
+    const sessionId = `qq-desktop-${randomUUID()}`
+    const provider = String(liveConfig.provider || 'deepseek-account')
+    const model = String(liveConfig.model || 'deepseek-flash')
+    const handle = await agents.create({
+      sessionId,
+      meta: {
+        cwd: String(liveConfig.desktopWorkspace || '').trim() || process.cwd(),
+      },
+      agentOptions: { provider, model },
+    })
+    try {
+      handle.agent.followup({
+        content: [{
+          type: 'text',
+          text: `你是运行在 DSH 桌面工作区的助手。请回答下面这个 QQ 群里的问题，只输出给提问者的最终回答，不要解释过程。\n\n问题：${question}`,
+        }],
+        source: { kind: 'user' },
+      })
+      await handle.agent.whenIdle()
+      const messages = handle.agent.session?.deriveMessages?.() ?? []
+      for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index]
+        if (!message || message.role !== 'assistant') continue
+        const text = (Array.isArray(message.content) ? message.content : [])
+          .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
+          .map((part) => part.text)
+          .join('')
+          .trim()
+        if (text.length > 0) return text
+      }
+      throw new Error('桌面工作区没有返回文本')
+    } finally {
+      await handle.dispose().catch(() => {})
+    }
+  }
+
   /** 先用一个小模型调用判断：这句话是在提问/求助，还是纯闲聊。 */
   async function classifyQuestion(text) {
     const value = String(text ?? '').trim()
