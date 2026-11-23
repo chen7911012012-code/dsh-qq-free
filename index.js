@@ -3597,6 +3597,19 @@ export async function apply(ctx, config) {
 
     disposers.push(webServer.register({
       kind: 'exact',
+      path: '/qq-free/desktop-reply',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const question = String(body.question ?? '').trim()
+        if (question.length === 0) throw new Error('question 不能为空')
+        const reply = await desktopAgentReply(question)
+        sendJson(res, 200, { ok: true, text: reply })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
       path: '/qq-free/chat',
       handler: route(async (req, res) => {
         if (!requirePost(req, res)) return
