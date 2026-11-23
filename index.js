@@ -1061,7 +1061,8 @@ export async function apply(ctx, config) {
       }
       const events = handle.agent.session?.snapshotEvents?.() ?? []
       const types = events.map((event) => event?.type).filter(Boolean)
-      throw new Error(`桌面工作区没有返回文本（events=${events.length}，types=${types.slice(-8).join(',')}）`)
+      const lastAttempt = [...events].reverse().find((event) => event?.type === 'assistant/attempt')
+      throw new Error(`桌面工作区没有返回文本（events=${events.length}，types=${types.slice(-8).join(',')}，attempt=${JSON.stringify(lastAttempt?.data ?? null).slice(0, 500)}）`)
     } finally {
       await handle.dispose().catch(() => {})
     }
