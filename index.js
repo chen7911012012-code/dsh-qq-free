@@ -380,22 +380,24 @@ export async function apply(ctx, config) {
     : []
   state.fortunes = state.fortunes !== null && typeof state.fortunes === 'object' ? state.fortunes : {}
 
-  // 网页密码统一为 6 位，主网页和分群网页互不重复
+  // 网页密码只补齐空值，绝不因重启重置已保存的 token
   const usedWebPasswords = new Set()
-  if (!isWebPassword(liveConfig.webToken)) {
+  if (typeof liveConfig.webToken === 'string' && liveConfig.webToken.length > 0) {
+    usedWebPasswords.add(liveConfig.webToken)
+  } else {
     const generated = uniqueWebPassword(usedWebPasswords)
     usedWebPasswords.add(generated)
     saveConfigPatch({ webToken: generated })
-  } else {
-    usedWebPasswords.add(liveConfig.webToken)
   }
   let groupPagesChanged = false
   for (const page of state.groupPages) {
-    if (!isWebPassword(page.token) || usedWebPasswords.has(page.token)) {
-      page.token = uniqueWebPassword(usedWebPasswords)
-      groupPagesChanged = true
+    if (typeof page.token === 'string' && page.token.length > 0 && !usedWebPasswords.has(page.token)) {
+      usedWebPasswords.add(page.token)
+      continue
     }
+    page.token = uniqueWebPassword(usedWebPasswords)
     usedWebPasswords.add(page.token)
+    groupPagesChanged = true
   }
   if (groupPagesChanged) persistState()
 
