@@ -14,7 +14,7 @@
  * @module @local/dsh-qq-free
  */
 
-import { randomBytes, randomUUID } from 'node:crypto'
+import { randomBytes, randomInt, randomUUID } from 'node:crypto'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, networkInterfaces } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
@@ -286,6 +286,28 @@ function formatTime(iso) {
 export async function apply(ctx, config) {
   const logger = ctx.logger ?? console
   mkdirSync(DATA_DIR, { recursive: true })
+
+  /** 6 位网页密码：大小写字母 + 数字混排，避免 O/0、I/1 等易混字符。 */
+  const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  function randomPassword(length = 6) {
+    let value = ''
+    for (let index = 0; index < length; index += 1) {
+      value += PASSWORD_ALPHABET[randomInt(0, PASSWORD_ALPHABET.length)]
+    }
+    return value
+  }
+
+  function isWebPassword(value) {
+    return typeof value === 'string' && /^[A-Za-z0-9]{6}$/.test(value)
+  }
+
+  function uniqueWebPassword(used) {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const value = randomPassword(6)
+      if (!used.has(value)) return value
+    }
+    throw new Error('无法生成不重复的网页密码')
+  }
 
   /** 行配置（patch）与网页写入的 config.json 合并后的生效配置。 */
   let liveConfig = {}
