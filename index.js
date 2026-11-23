@@ -2719,14 +2719,25 @@ export async function apply(ctx, config) {
       const expiresRaw = String(body.expiresAt ?? '').trim()
       const expiresAt = expiresRaw.length > 0 ? Date.parse(expiresRaw) : 0
       if (expiresRaw.length > 0 && !Number.isFinite(expiresAt)) throw new Error('有效期格式不正确')
+      const requestedToken = String(body.token ?? '').trim()
+      if (requestedToken.length > 0 && !isWebPassword(requestedToken)) throw new Error('网页密码必须是 6 位字母或数字')
       let page = state.groupPages.find((item) => item.groupOpenid === groupOpenid)
+      const used = new Set([
+        String(liveConfig.webToken || ''),
+        ...state.groupPages.filter((item) => item.groupOpenid !== groupOpenid).map((item) => String(item.token || '')),
+      ])
+      if (requestedToken.length > 0 && used.has(requestedToken)) throw new Error('网页密码已被使用，请换一个')
       if (!page) {
         page = {
           groupOpenid,
-          token: randomBytes(18).toString('hex'),
+          token: requestedToken || uniqueWebPassword(used),
           createdAt: new Date().toISOString(),
         }
         state.groupPages.push(page)
+      } else if (requestedToken.length > 0) {
+        page.token = requestedToken
+      } else if (!isWebPassword(page.token)) {
+        page.token = uniqueWebPassword(used)
       }
       page.expiresAt = expiresAt > 0 ? expiresAt : 0
       page.permissions = {
@@ -4115,12 +4126,17 @@ export async function apply(ctx, config) {
         if ('tunnelEnabled' in body) next.tunnelEnabled = body.tunnelEnabled === true
         if (typeof body.tunnelBin === 'string') next.tunnelBin = body.tunnelBin.trim()
         if (body.regenerate === true) {
-          next.webToken = randomBytes(16).toString('hex')
+          next.webToken = uniqueWebPassword(new Set(state.groupPages.map((item) => String(item.token || ''))))
         } else if (typeof body.token === 'string' && body.token.trim().length > 0) {
-          next.webToken = body.token.trim().slice(0, 128)
+          const requested = body.token.trim()
+          if (!isWebPassword(requested)) throw new Error('网页密码必须是 6 位字母或数字')
+          if (state.groupPages.some((item) => String(item.token || '') === requested)) {
+            throw new Error('网页密码已被分群网页使用，请换一个')
+          }
+          next.webToken = requested
         }
-        if (next.webEnabled && (!next.webToken || next.webToken.length === 0)) {
-          next.webToken = randomBytes(16).toString('hex')
+        if (!isWebPassword(next.webToken)) {
+          next.webToken = uniqueWebPassword(new Set(state.groupPages.map((item) => String(item.token || ''))))
         }
         if (!writeJson(CONFIG_FILE, next)) throw new Error('保存远程发言设置失败')
         reloadConfig()
