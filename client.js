@@ -262,7 +262,7 @@ window.__ModuleLoader__.load({
       const [jvEnabled, setJvEnabled] = useState(null)
       const [jvGroups, setJvGroups] = useState([])
       const [cleanupForm, setCleanupForm] = useState(null)
-      const [gpForm, setGpForm] = useState({ groupOpenid: '', expiresAt: '', say: true, joinApprove: true, memberManage: true, settings: true })
+      const [gpForm, setGpForm] = useState({ groupOpenid: '', expiresAt: '', token: '', say: true, joinApprove: true, memberManage: true, settings: true })
       const [fortuneForm, setFortuneForm] = useState(null)
       const [mentionMember, setMentionMember] = useState('')
       const [mentionName, setMentionName] = useState('')
@@ -873,6 +873,7 @@ window.__ModuleLoader__.load({
           action: 'save',
           groupOpenid: form.groupOpenid,
           expiresAt: form.expiresAt,
+          token: form.token,
           say: form.say !== false,
           joinApprove: form.joinApprove !== false,
           memberManage: form.memberManage !== false,
@@ -1437,8 +1438,8 @@ window.__ModuleLoader__.load({
                   }))),
               h('label', { className: 'qqf-field qqf-field--full' }, h('span', null, '访问 token'),
                 h('input', {
-                  className: 'qqf-input', value: remoteForm?.token ?? '',
-                  placeholder: '留空会在启用时自动生成',
+                  className: 'qqf-input', value: remoteForm?.token ?? '', maxLength: 6,
+                  placeholder: '6 位字母/数字，留空自动生成',
                   onChange: (event) => setRemoteForm({ ...remoteForm, token: event.target.value }),
                 })),
               h('label', { className: 'qqf-row' },
@@ -2108,6 +2109,12 @@ window.__ModuleLoader__.load({
                 },
                   h('option', { value: '' }, '选择群聊…'),
                   groupTargets.map((target) => h('option', { key: target.id, value: target.openid }, target.name))),
+                h('label', { className: 'qqf-field' }, h('span', null, '网页密码（6位）'),
+                  h('input', {
+                    className: 'qqf-input', value: gpForm.token, maxLength: 6,
+                    placeholder: '留空自动生成',
+                    onChange: (event) => setGpForm({ ...gpForm, token: event.target.value }),
+                  })),
                 h('label', { className: 'qqf-field' }, h('span', null, '有效期至'),
                   h('input', {
                     className: 'qqf-input', type: 'datetime-local', value: gpForm.expiresAt,
@@ -2149,6 +2156,22 @@ window.__ModuleLoader__.load({
                             say: !entry.permissions?.say,
                           }),
                         }, entry.permissions?.say ? '关闭发言' : '开启发言'),
+                        h('button', {
+                          className: 'qqf-btn qqf-btn--sm qqf-btn--ghost', disabled: busy !== '',
+                          onClick: () => {
+                            const next = window.prompt('输入新的 6 位网页密码（字母或数字）', entry.token)
+                            if (next === null) return
+                            void saveGroupPage({
+                              groupOpenid: entry.groupOpenid,
+                              expiresAt: entry.expiresAt ? new Date(entry.expiresAt).toISOString() : '',
+                              token: next.trim(),
+                              say: entry.permissions?.say !== false,
+                              joinApprove: entry.permissions?.joinApprove !== false,
+                              memberManage: entry.permissions?.memberManage !== false,
+                              settings: entry.permissions?.settings !== false,
+                            })
+                          },
+                        }, '改密码'),
                         h('button', {
                           className: 'qqf-btn qqf-btn--sm qqf-btn--danger', disabled: busy !== '',
                           onClick: () => void removeGroupPage(entry),
