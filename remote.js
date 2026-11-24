@@ -8,7 +8,8 @@
  */
 
 import { createServer } from 'node:http'
-import { timingSafeEqual } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 
 const MAX_BODY = 10 * 1024 * 1024
 
@@ -51,8 +52,35 @@ function readBody(req) {
 }
 
 function json(res, status, body) {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
-  res.end(JSON.stringify(body))
+  const raw = Buffer.from(JSON.stringify(body), 'utf8')
+  const accept = String(res.req?.headers['accept-encoding'] ?? '')
+  const compressed = raw.length > 1024 && /\bgzip\b/.test(accept)
+  res.writeHead(status, {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+    ...(compressed ? { 'content-encoding': 'gzip', vary: 'Accept-Encoding' } : {}),
+  })
+  res.end(compressed ? gzipSync(raw, { level: 6 }) : raw)
+}
+
+function html(req, res, status, body, cacheable = true) {
+  const raw = Buffer.from(body, 'utf8')
+  const etag = `"${createHash('sha1').update(raw).digest('hex')}"`
+  if (cacheable && req.headers['if-none-match'] === etag) {
+    res.writeHead(304, { etag, 'cache-control': 'public, max-age=3600' })
+    res.end()
+    return
+  }
+  const accept = String(req.headers['accept-encoding'] ?? '')
+  const compressed = /\bgzip\b/.test(accept)
+  res.writeHead(status, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': cacheable ? 'public, max-age=3600' : 'no-store',
+    etag,
+    vary: 'Accept-Encoding',
+    ...(compressed ? { 'content-encoding': 'gzip' } : {}),
+  })
+  res.end(compressed ? gzipSync(raw, { level: 6 }) : raw)
 }
 
 import { REMOTE_PAGE } from './remote-page.js'
