@@ -2293,6 +2293,40 @@ window.__ModuleLoader__.load({
                 : h('p', { className: 'qqf-empty' }, '还没有群功能屏蔽。')),
 
             h(Card, {
+              title: '功能屏蔽名单',
+              wide: true,
+              hint: '在指定群单独屏蔽某个功能；例如只在某个群关闭签到/运势/AI 聊天。已被群功能屏蔽覆盖的功能无需重复添加。',
+            },
+              h('div', { className: 'qqf-row' },
+                h('select', {
+                  className: 'qqf-select', value: fbFeature,
+                  onChange: (event) => setFbFeature(event.target.value),
+                },
+                  [['chat', 'AI 聊天'], ['auto', '自主发言'], ['welcome', '入群欢迎'], ['joinNotice', '入群申请通知'], ['joinRequest', '入群申请处理'], ['joinVerify', '入群人机验证'], ['fortune', '今日运势'], ['commands', '群管理命令'], ['moderation', '违禁词'], ['info', '获取信息']]
+                    .map(([key, label]) => h('option', { key, value: key }, label))),
+                h('select', {
+                  className: 'qqf-select qqf-grow', value: fbGroup,
+                  onChange: (event) => setFbGroup(event.target.value),
+                },
+                  h('option', { value: '' }, '选择群聊…'),
+                  groupTargets.map((target) => h('option', { key: target.id, value: target.openid }, target.name))),
+                h('button', {
+                  className: 'qqf-btn', disabled: busy !== '' || fbGroup === '',
+                  onClick: () => void addFeatureBlock(),
+                }, busy === 'feature-block' ? '添加中…' : '添加屏蔽')),
+              data.featureBlocks && data.featureBlocks.length > 0
+                ? h('ul', { className: 'qqf-targets' },
+                  data.featureBlocks.map((entry) => h('li', { key: `${entry.groupOpenid}-${entry.feature}`, className: 'qqf-target' },
+                    h('div', { className: 'qqf-target-main' },
+                      h('span', { className: 'qqf-target-name' }, entry.feature),
+                      h('span', { className: 'qqf-mono' }, groupTargets.find((target) => target.openid === entry.groupOpenid)?.name || entry.groupOpenid)),
+                    h('button', {
+                      className: 'qqf-btn qqf-btn--sm qqf-btn--danger', disabled: busy !== '',
+                      onClick: () => void removeFeatureBlock(entry),
+                    }, '取消'))))
+                : h('p', { className: 'qqf-empty' }, '还没有按功能屏蔽的群。')),
+
+            h(Card, {
               title: 'DeepSeek 试聊',
               hint: '不经过 QQ，直接在网页里试人设和回复效果。',
             },
