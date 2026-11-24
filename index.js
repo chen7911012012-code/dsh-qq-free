@@ -2143,7 +2143,29 @@ export async function apply(ctx, config) {
     return state.featureBlocks.some((item) => item.groupOpenid === groupOpenid && item.feature === feature)
   }
 
-  function handleGroupBlocks(body) {
+  function handleFeatureBlocks(body) {
+    const action = String(body.action ?? 'list')
+    if (action === 'add') {
+      const groupOpenid = assertGroupOpenid(body.groupOpenid)
+      const feature = String(body.feature ?? '')
+      if (!GROUP_FEATURES.includes(feature)) throw new Error('未知功能')
+      if (!state.featureBlocks.some((item) => item.groupOpenid === groupOpenid && item.feature === feature)) {
+        state.featureBlocks.push({ groupOpenid, feature, addedAt: new Date().toISOString() })
+        persistState()
+      }
+      return { saved: true }
+    }
+    if (action === 'remove') {
+      const groupOpenid = String(body.groupOpenid ?? '')
+      const feature = String(body.feature ?? '')
+      state.featureBlocks = state.featureBlocks.filter((item) => item.groupOpenid !== groupOpenid || item.feature !== feature)
+      persistState()
+      return { removed: true }
+    }
+    return { list: state.featureBlocks, features: GROUP_FEATURES }
+  }
+
+
     const action = String(body.action ?? 'list')
     if (action === 'save') {
       const groupOpenid = assertGroupOpenid(body.groupOpenid)
