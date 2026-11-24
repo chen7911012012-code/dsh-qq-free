@@ -475,6 +475,25 @@ export async function apply(ctx, config) {
     })
   }
 
+  /**
+   * QQ 昵称里可能带零宽空格、双向控制符、Hangul 填充符之类的不可见字符，
+   * 直接塞进 <option> 会显示成空白名或被 bidi 控制符打乱成「乱码」。
+   * 这里只做展示用清洗：去掉控制/格式字符、合并空白，清洗后没有可见字符
+   * 时退回 openid 尾号，避免下拉框出现空白选项。
+   */
+  function memberDisplayName(name, openid) {
+    const cleaned = String(name ?? '')
+      .replace(/[\u0000-\u001F\u007F-\u009F\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180E\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\u3164\uFFA0\uFFFB\uFFFC]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    const fallbackOpenid = String(openid ?? '').trim()
+    const label = cleaned.length > 0
+      ? cleaned
+      : (fallbackOpenid.length >= 6 ? `成员${fallbackOpenid.slice(-6)}` : '成员')
+    const chars = Array.from(label)
+    return chars.length > 24 ? `${chars.slice(0, 24).join('')}…` : label
+  }
+
   function rememberMember({ groupOpenid, memberOpenid, username, memberRole }) {
     if (typeof groupOpenid !== 'string' || groupOpenid.length === 0) return
     if (typeof memberOpenid !== 'string' || memberOpenid.length === 0) return
@@ -826,7 +845,7 @@ export async function apply(ctx, config) {
     const everyone = target.scope === 'group' && meta.everyone === true
     if (mention.length > 0 && !/^[A-Za-z0-9_-]{8,}$/.test(mention)) throw new Error('@成员 openid 不合法')
     const mentionName = mention.length > 0
-      ? (state.members.find((item) => item.groupOpenid === target.openid && item.openid === mention)?.name ?? '')
+      ? memberDisplayName(state.members.find((item) => item.groupOpenid === target.openid && item.openid === mention)?.name ?? '', mention)
       : ''
     const post = (payload) => fetch(`${base}${path}`, {
       method: 'POST',
@@ -2858,7 +2877,10 @@ export async function apply(ctx, config) {
       features: GROUP_FEATURES,
       blocks: { all: block.all === true, features: Array.isArray(block.features) ? block.features : [] },
       pendingJoins: state.pendingJoins.filter((item) => item.groupOpenid === groupOpenid),
-      members: state.members.filter((item) => item.groupOpenid === groupOpenid).slice(-100),
+      members: state.members
+        .filter((item) => item.groupOpenid === groupOpenid)
+        .slice(-100)
+        .map((item) => ({ ...item, name: memberDisplayName(item.name, item.openid) })),
       managers: state.groupManagers.filter((item) => item.groupOpenid === groupOpenid),
       announcements: state.announcements.filter((item) => Array.isArray(item.groupOpenids) && item.groupOpenids.includes(groupOpenid)),
       welcome: {
@@ -3509,7 +3531,7 @@ export async function apply(ctx, config) {
       members: state.members.slice(-200).map((item) => ({
         groupOpenid: item.groupOpenid,
         openid: item.openid,
-        name: item.name,
+        name: memberDisplayName(item.name, item.openid),
         role: item.role,
       })),
       log: state.log.slice(-80).reverse().map((entry) => ({ ...entry, atLabel: formatTime(entry.at) })),
