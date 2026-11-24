@@ -352,6 +352,18 @@ if (ws) {
   const chatReply = sent.slice(beforeChat).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-CHAT')
   check('闲聊用智能体人设回复', Boolean(chatReply) && (await call('/qq-free/state')).body.chatLog.some((entry) => entry.question === '今天好累' && entry.source === 'agent'))
   check('记录群成员目录', (await call('/qq-free/state')).body.members.some((member) => member.openid === 'ASKER1'))
+
+  // 昵称里带不可见字符时，状态接口要给出能显示的成员名（不能空白名 / bidi 乱码）
+  ws.emit({ op: 0, s: 40, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-NAME1', content: '路过', group_openid: GROUP, mentions: [], author: { member_openid: 'BLANKNAME000123', member_nickname: '\u3164', member_role: 'member' } } })
+  ws.emit({ op: 0, s: 41, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-NAME2', content: '路过', group_openid: GROUP, mentions: [], author: { member_openid: 'BIDIMEMBER01', member_nickname: '上传-Komorebi\u1160\u2067~喵\u2067\u202D', member_role: 'member' } } })
+  await sleep(120)
+  const nameState = (await call('/qq-free/state')).body
+  const blankMember = nameState.members.find((member) => member.openid === 'BLANKNAME000123')
+  const bidiMember = nameState.members.find((member) => member.openid === 'BIDIMEMBER01')
+  check('空白昵称不会显示成空白名', Boolean(blankMember) && blankMember.name.trim().length > 0, JSON.stringify(blankMember))
+  check('空白昵称回退到 openid 尾号', blankMember?.name === '成员000123', JSON.stringify(blankMember))
+  check('昵称里的双向/零宽字符被清掉', bidiMember?.name === '上传-Komorebi~喵', JSON.stringify(bidiMember))
+
   const chatState = (await call('/qq-free/state')).body
   check('问答写入对话记录', chatState.chatLog.some((entry) => entry.question.includes('你好') && entry.answer.length > 0))
   check('对话写入工作区文件', existsSync(join(dataRoot, 'qq-replies.md')) && readFileSync(join(dataRoot, 'qq-replies.md'), 'utf8').includes('你好'))
