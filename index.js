@@ -1353,6 +1353,22 @@ export async function apply(ctx, config) {
    * 群内管理员命令：同意 / 拒绝 [申请号]。
    * 返回给群里的被动回复文本；非命令返回 null。
    */
+  function handleMemberRemove(data) {
+    const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
+    const memberOpenid = String(data.member_openid ?? data.user_openid ?? '')
+    if (groupOpenid.length === 0 || memberOpenid.length === 0) return
+    state.members = state.members.filter((item) => !(item.groupOpenid === groupOpenid && item.openid === memberOpenid))
+    state.groupManagers = state.groupManagers.filter((item) => !(item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid))
+    state.blockedMembers = state.blockedMembers.filter((item) => !(item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid))
+    state.blockedMentions = state.blockedMentions.filter((item) => !(item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid))
+    delete state.memberJoins[`${groupOpenid}:${memberOpenid}`]
+    delete state.memberActivity[`${groupOpenid}:${memberOpenid}`]
+    for (const entry of [...state.joinVerifications].filter((item) => item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid)) {
+      clearVerification(entry)
+    }
+    persistState()
+  }
+
   async function handleMemberAdd(data) {    const groupOpenid = String(data.group_openid ?? '')
     const memberOpenid = String(data.member_openid ?? '')
     await startJoinVerification(data)
@@ -2555,6 +2571,7 @@ export async function apply(ctx, config) {
     },
     onReply: (entry) => recordChatReply(entry),
     onMemberAdd: (data) => handleMemberAdd(data),
+    onMemberRemove: (data) => handleMemberRemove(data),
     onJoinRequest: (data) => recordJoinRequest(data),
     onGroupCommand: (data) => handleGroupCommand(data),
     onMemberSeen: (data) => rememberMember(data),
