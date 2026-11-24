@@ -363,6 +363,9 @@ export async function apply(ctx, config) {
   state.groupBlocks = Array.isArray(state.groupBlocks)
     ? state.groupBlocks.filter((item) => item && typeof item.groupOpenid === 'string').slice(-200)
     : []
+  state.featureBlocks = Array.isArray(state.featureBlocks)
+    ? state.featureBlocks.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.feature === 'string').slice(-500)
+    : []
   state.memberJoins = state.memberJoins !== null && typeof state.memberJoins === 'object' ? state.memberJoins : {}
   state.announcements = Array.isArray(state.announcements)
     ? state.announcements.filter((item) => item && typeof item.id === 'string' && typeof item.text === 'string').slice(-100)
@@ -2133,9 +2136,11 @@ export async function apply(ctx, config) {
 
   function isGroupFeatureBlocked(groupOpenid, feature) {
     const block = getGroupBlock(groupOpenid)
-    if (block === null) return false
-    if (block.all === true) return true
-    return Array.isArray(block.features) && block.features.includes(feature)
+    if (block !== null) {
+      if (block.all === true) return true
+      if (Array.isArray(block.features) && block.features.includes(feature)) return true
+    }
+    return state.featureBlocks.some((item) => item.groupOpenid === groupOpenid && item.feature === feature)
   }
 
   function handleGroupBlocks(body) {
