@@ -2165,7 +2165,7 @@ export async function apply(ctx, config) {
     return { list: state.featureBlocks, features: GROUP_FEATURES }
   }
 
-
+  function handleGroupBlocks(body) {
     const action = String(body.action ?? 'list')
     if (action === 'save') {
       const groupOpenid = assertGroupOpenid(body.groupOpenid)
@@ -3427,6 +3427,7 @@ export async function apply(ctx, config) {
       blockedMembers: state.blockedMembers.slice(-100),
       blockedMentions: state.blockedMentions.slice(-100),
       groupBlocks: state.groupBlocks.slice(-200),
+      featureBlocks: state.featureBlocks.slice(-500),
       announcements: state.announcements.slice(-50),
       groupManagers: state.groupManagers.slice(-200),
       groupPages: state.groupPages.map((item) => ({
