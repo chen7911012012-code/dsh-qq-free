@@ -356,6 +356,13 @@ export function createChatChannel(deps) {
       })
       return
     }
+    if (type === 'GROUP_MEMBER_REMOVE') {
+      status.lastEventAt = new Date().toISOString()
+      try { onMemberRemove?.(data) } catch (error) {
+        logger.warn(`qq-free channel: 退群处理失败 ${error instanceof Error ? error.message : String(error)}`)
+      }
+      return
+    }
     if (type === 'GROUP_JOIN_REQUEST') {
       status.lastEventAt = new Date().toISOString()
       if (typeof onGroupSeen === 'function' && data.group_openid) {
