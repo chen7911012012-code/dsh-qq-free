@@ -622,6 +622,20 @@ if (ws) {
   result = await call('/qq-free/group-blocks', 'POST', { action: 'remove', groupOpenid: GROUP })
   check('取消群屏蔽', result.status === 200 && !result.body.state.groupBlocks.some((entry) => entry.groupOpenid === GROUP))
 
+  result = await call('/qq-free/feature-blocks', 'POST', { action: 'add', groupOpenid: GROUP, feature: 'chat' })
+  check('添加按功能屏蔽', result.status === 200 && result.body.state.featureBlocks.some((entry) => entry.groupOpenid === GROUP && entry.feature === 'chat'))
+  const beforeFeatureBlock = sent.length
+  ws.emit({ op: 0, s: 20, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-FEATURE-BLOCK', content: '<@BOT> 你好', group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'NORMALUSER1', member_role: 'member' } } })
+  await sleep(150)
+  check('指定群屏蔽 AI 聊天后不回复', sent.length === beforeFeatureBlock)
+  await call('/qq-free/feature-blocks', 'POST', { action: 'remove', groupOpenid: GROUP, feature: 'chat' })
+
+  ws.emit({ op: 0, s: 21, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-MEMBER-LEAVE', content: '要走了', group_openid: GROUP, mentions: [], author: { member_openid: 'LEAVER001', member_nickname: '离开的人', member_role: 'member' } } })
+  await sleep(100)
+  ws.emit({ op: 0, s: 22, t: 'GROUP_MEMBER_REMOVE', d: { group_openid: GROUP, member_openid: 'LEAVER001' } })
+  await sleep(100)
+  check('成员退群后从成员列表移除', !(await call('/qq-free/state')).body.members.some((entry) => entry.openid === 'LEAVER001'))
+
   result = await call('/qq-free/config', 'POST', { joinVerifyEnabled: true, joinVerifyGroups: [GROUP] })
   check('开启入群验证', result.status === 200 && result.body.state.joinVerify.enabled === true)
   const readVerifyCode = (memberOpenid) => JSON.parse(readFileSync(join(dataRoot, '.qq-free', 'state.json'), 'utf8'))
