@@ -208,7 +208,7 @@ await module.apply(ctx, {
   quietHoursStart: '23:00',
   quietHoursEnd: '08:00',
 })
-check('注册了 28 条 HTTP 路由', routes.size === 28, [...routes.keys()].join(', '))
+check('注册了 30 条 HTTP 路由', routes.size === 30, [...routes.keys()].join(', '))
 check('注册了 3 个工具', tools.length === 3)
 const qaGuidance = sections.find((section) => section.name === 'qq-free:qa-guidance')
 const qaLibrary = sections.find((section) => section.name === 'qq-free:qa-library')
@@ -239,7 +239,7 @@ result = await call('/qq-free/cloud', 'POST', {
 check('保存 WebDAV 云端同步配置', result.status === 200 && result.body.state.cloud.user === 'tester' && result.body.state.cloud.hasPassword === true)
 
 result = await call('/qq-free/github', 'POST', {
-  action: 'save', enabled: false, owner: 'chen7911012012-code', repo: 'dsh-qq-free', token: 'test-token', auto: true,
+  action: 'save', enabled: false, owner: 'chen7911012012-code', repo: 'dsh-qq-free', token: 'test12', auto: true,
 })
 check('保存 GitHub 直连配置', result.status === 200 && result.body.state.github.owner === 'chen7911012012-code' && result.body.state.github.hasToken === true)
 
@@ -705,27 +705,27 @@ result = await call('/qq-free/channel', 'POST', { enabled: false, confirm: true 
 check('停止通道', result.status === 200 && result.body.state.chat.state === 'stopped')
 
 const remotePort = 37000 + (process.pid % 500)
-result = await call('/qq-free/remote', 'POST', { enabled: true, port: remotePort, token: 'test-token' })
-check('启用远程网页', result.status === 200 && result.body.state.remote.running === true && result.body.state.remote.token === 'test-token', result.body.error)
+result = await call('/qq-free/remote', 'POST', { enabled: true, port: remotePort, token: 'test12' })
+check('启用远程网页', result.status === 200 && result.body.state.remote.running === true && result.body.state.remote.token === 'test12', result.body.error)
 await sleep(200)
 const remoteBase = `http://127.0.0.1:${remotePort}`
 const pageRes = await httpCall(`${remoteBase}/`)
 check('远程网页可打开', pageRes.status === 200 && pageRes.text.includes('QQ 自由发言'))
 const unauth = await httpCall(`${remoteBase}/api/state`)
 check('远程接口拒绝无 token', unauth.status === 401)
-const authRes = await httpCall(`${remoteBase}/api/state`, { headers: { authorization: 'Bearer test-token' } })
+const authRes = await httpCall(`${remoteBase}/api/state`, { headers: { authorization: 'Bearer test12' } })
 const authBody = authRes.json()
 check('远程接口 token 可用', authRes.status === 200 && authBody.ok === true && Array.isArray(authBody.targets))
 const remoteSend = await httpCall(`${remoteBase}/api/send`, {
   method: 'POST',
-  headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' },
+  headers: { authorization: 'Bearer test12', 'content-type': 'application/json' },
   body: { targetId, text: '远程网页发送测试' },
 })
 check('远程网页可发言', remoteSend.status === 200 && remoteSend.json().ok === true)
 
 result = await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: false, expiresAt: '' })
 const groupToken = result.body.state?.groupPages?.[0]?.token
-check('生成分群网页', result.status === 200 && typeof groupToken === 'string' && groupToken.length > 10)
+check('生成分群网页', result.status === 200 && typeof groupToken === 'string' && groupToken.length === 6)
 const gpState = await httpCall(`${remoteBase}/gapi/state?token=${encodeURIComponent(groupToken)}`)
 check('分群网页状态可读', gpState.status === 200 && gpState.json().permissions?.say === false)
 const gpOverview = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
@@ -747,7 +747,7 @@ const gpAllowed = await httpCall(`${remoteBase}/gapi/say?token=${encodeURICompon
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { text: '分群网页发言测试' },
 })
 check('分群有权限可发言', gpAllowed.status === 200 || String(gpAllowed.json().error ?? '').includes('上限'))
-const mainStill = await httpCall(`${remoteBase}/api/state`, { headers: { authorization: 'Bearer test-token' } })
+const mainStill = await httpCall(`${remoteBase}/api/state`, { headers: { authorization: 'Bearer test12' } })
 check('主网页不受分群权限限制', mainStill.status === 200)
 const gpChatBlock = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'save-blocks', all: false, features: ['chat'] },
