@@ -202,9 +202,9 @@ export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMe
           chat: state.chat,
           targets: state.targets,
           boards: state.boards,
-          members: (state.members || []).slice(-60),
+          members: state.members,
           auto: state.auto,
-          qa: (state.qa || []).slice(0, 50),
+          qa: state.qa,
           moderation: state.moderation,
           welcome: state.welcome,
           pendingJoins: state.pendingJoins,
@@ -212,7 +212,7 @@ export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMe
           blockedMentions: state.blockedMentions,
           fortune: state.fortune,
           fortunes: state.fortunes,
-          log: (state.log || []).slice(-20),
+          log: state.log,
         })
         return
       }
