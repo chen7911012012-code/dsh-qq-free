@@ -54,6 +54,7 @@ export function createChatChannel(deps) {
   const { getConfig, getAccessToken, searchQa, recordQaHit, generateReply, onReply } = deps
   const classifyQuestion = deps.classifyQuestion
   const onMemberAdd = deps.onMemberAdd
+  const onMemberRemove = deps.onMemberRemove
   const onJoinRequest = deps.onJoinRequest
   const onGroupCommand = deps.onGroupCommand
   const onMemberSeen = deps.onMemberSeen
