@@ -1353,8 +1353,7 @@ export async function apply(ctx, config) {
    * 群内管理员命令：同意 / 拒绝 [申请号]。
    * 返回给群里的被动回复文本；非命令返回 null。
    */
-  async function handleMemberAdd(data) {
-    const groupOpenid = String(data.group_openid ?? '')
+  async function handleMemberAdd(data) {    const groupOpenid = String(data.group_openid ?? '')
     const memberOpenid = String(data.member_openid ?? '')
     await startJoinVerification(data)
     if (groupOpenid.length > 0 && memberOpenid.length > 0) {
