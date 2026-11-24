@@ -252,6 +252,8 @@ window.__ModuleLoader__.load({
       const [gbGroup, setGbGroup] = useState('')
       const [gbAll, setGbAll] = useState(false)
       const [gbFeatures, setGbFeatures] = useState([])
+      const [fbFeature, setFbFeature] = useState('chat')
+      const [fbGroup, setFbGroup] = useState('')
       const [annForm, setAnnForm] = useState({ name: '', groups: [], date: '', time: '09:00', text: '', enabled: true })
       const [annImage, setAnnImage] = useState(null)
       const [ownerId, setOwnerId] = useState(null)
@@ -760,6 +762,25 @@ window.__ModuleLoader__.load({
           features: gbFeatures,
         }))
         if (result !== null) flash('ok', '群功能屏蔽已保存。')
+      }
+
+      async function addFeatureBlock() {
+        if (fbGroup === '') return
+        const result = await run('feature-block', () => request('/qq-free/feature-blocks', {
+          action: 'add',
+          groupOpenid: fbGroup,
+          feature: fbFeature,
+        }))
+        if (result !== null) flash('ok', '已加入功能屏蔽名单。')
+      }
+
+      async function removeFeatureBlock(entry) {
+        const result = await run(`feature-block-${entry.groupOpenid}-${entry.feature}`, () => request('/qq-free/feature-blocks', {
+          action: 'remove',
+          groupOpenid: entry.groupOpenid,
+          feature: entry.feature,
+        }))
+        if (result !== null) flash('ok', '已从屏蔽名单移除。')
       }
 
       async function removeGroupBlock(entry) {
