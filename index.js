@@ -3950,6 +3950,17 @@ export async function apply(ctx, config) {
 
     disposers.push(webServer.register({
       kind: 'exact',
+      path: '/qq-free/feature-blocks',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const result = handleFeatureBlocks(body)
+        sendJson(res, 200, { ok: true, ...result, state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
       path: '/qq-free/group-blocks',
       handler: route(async (req, res) => {
         if (!requirePost(req, res)) return
