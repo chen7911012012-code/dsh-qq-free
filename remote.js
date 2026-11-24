@@ -112,8 +112,7 @@ export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMe
   async function handle(req, res) {
     const url = new URL(req.url ?? '/', 'http://localhost')
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
-      res.end(REMOTE_PAGE)
+      html(req, res, 200, REMOTE_PAGE)
       return
     }
     if (url.pathname.startsWith('/g/')) {
@@ -121,12 +120,10 @@ export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMe
       const resolved = groupPage?.resolve ? groupPage.resolve(token) : { status: 'missing' }
       if (resolved.status !== 'ok') {
         const message = resolved.status === 'expired' ? '这个分群网页链接已过期。' : '分群网页不存在。'
-        res.writeHead(resolved.status === 'expired' ? 410 : 404, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
-        res.end(`<!doctype html><meta charset="utf-8"><title>分群网页</title><body style="font:16px system-ui;padding:40px">${message}</body>`)
+        html(req, res, resolved.status === 'expired' ? 410 : 404, `<!doctype html><meta charset="utf-8"><title>分群网页</title><body style="font:16px system-ui;padding:40px">${message}</body>`, false)
         return
       }
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
-      res.end(renderGroupPage(token))
+      html(req, res, 200, renderGroupPage(token))
       return
     }
     if (url.pathname === '/gapi/state' || url.pathname === '/gapi/overview' || url.pathname === '/gapi/say' || url.pathname === '/gapi/action') {
