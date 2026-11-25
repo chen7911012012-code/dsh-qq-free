@@ -140,6 +140,13 @@ function remoteUrls(port, token) {
   return urls
 }
 
+/** 局域网优先的本地访问地址（用于没有公网地址时的兜底）。 */
+function lanBaseUrl(port) {
+  const urls = remoteUrls(port, '')
+  const preferred = urls.find((url) => !url.includes('127.0.0.1')) ?? urls[0] ?? ''
+  return preferred.replace(/\/+$/, '')
+}
+
 /** 只挑出已知键，并做最基本的类型收敛。 */
 function pickConfig(input) {
   const out = {}
