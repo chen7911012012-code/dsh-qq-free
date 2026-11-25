@@ -743,6 +743,8 @@ const fixedLink = result.body.state.remote.publicUrls?.[0] ?? ''
 check('主网页链接用固定地址', fixedLink === `${fixedBase}/?token=test12`, fixedLink)
 const badBase = await call('/qq-free/remote', 'POST', { enabled: true, port: remotePort, token: 'test12', publicBaseUrl: 'not-a-url' })
 check('非法公网地址被拒绝', badBase.status !== 200, JSON.stringify(badBase.body))
+result = await call('/qq-free/remote', 'POST', { enabled: true, port: remotePort, token: 'test12', tunnelEnabled: true })
+check('cloudflared 临时隧道已停用（外网只走 Funnel）', result.status === 200 && result.body.state.remote.tunnel.enabled === false, JSON.stringify(result.body.state.remote.tunnel))
 await sleep(200)
 const remoteBase = `http://127.0.0.1:${remotePort}`
 const pageRes = await httpCall(`${remoteBase}/`)
