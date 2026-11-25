@@ -733,6 +733,15 @@ check('停止通道', result.status === 200 && result.body.state.chat.state === 
 const remotePort = 37000 + (process.pid % 500)
 result = await call('/qq-free/remote', 'POST', { enabled: true, port: remotePort, token: 'test12' })
 check('启用远程网页', result.status === 200 && result.body.state.remote.running === true && result.body.state.remote.token === 'test12', result.body.error)
+const fixedBase = 'https://unit-test.tail1234.ts.net'
+result = await call('/qq-free/remote', 'POST', {
+  enabled: true, port: remotePort, token: 'test12', publicBaseUrl: `${fixedBase}/`,
+})
+check('固定公网地址按 http(s) 保存并去掉末尾斜杠', result.status === 200 && result.body.state.remote.publicUrl === fixedBase, result.body.error)
+const fixedLink = result.body.state.remote.publicUrls?.[0] ?? ''
+check('主网页链接用固定地址', fixedLink === `${fixedBase}/?token=test12`, fixedLink)
+const badBase = await call('/qq-free/remote', 'POST', { enabled: true, port: remotePort, token: 'test12', publicBaseUrl: 'not-a-url' })
+check('非法公网地址被拒绝', badBase.status !== 200, JSON.stringify(badBase.body))
 await sleep(200)
 const remoteBase = `http://127.0.0.1:${remotePort}`
 const pageRes = await httpCall(`${remoteBase}/`)
@@ -752,6 +761,8 @@ check('远程网页可发言', remoteSend.status === 200 && remoteSend.json().ok
 result = await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: false, expiresAt: '' })
 const groupToken = result.body.state?.groupPages?.[0]?.token
 check('生成分群网页', result.status === 200 && typeof groupToken === 'string' && groupToken.length === 6)
+const groupPageUrl = result.body.state?.groupPages?.[0]?.url
+check('分群网页链接是固定公网地址（不是相对路径）', groupPageUrl === `${fixedBase}/g/${groupToken}`, groupPageUrl)
 const gpState = await httpCall(`${remoteBase}/gapi/state?token=${encodeURIComponent(groupToken)}`)
 check('分群网页状态可读', gpState.status === 200 && gpState.json().permissions?.say === false)
 const gpOverview = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
