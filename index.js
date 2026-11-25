@@ -347,9 +347,6 @@ export async function apply(ctx, config) {
     return next
   }
 
-  /** 没有固定地址时，临时隧道地址也能让手机打开（会随重启变化）。 */
-  let runningTunnelUrl = () => ''
-
   /** 网页对外的基础地址：只认固定公网地址（Tailscale Funnel），没有就退回局域网。 */
   function siteBaseUrl() {
     const configured = String(liveConfig.publicBaseUrl || '').trim()
@@ -3157,10 +3154,6 @@ export async function apply(ctx, config) {
     getConfig: () => liveConfig,
     logger,
   })
-  runningTunnelUrl = () => {
-    const status = tunnel.status()
-    return status.running ? String(status.url || '') : ''
-  }
 
   ctx.effect(() => {
     // 不再启动 cloudflared：旧版本留下的隧道进程直接收掉，保证对外只有 Funnel 固定域名
@@ -4373,11 +4366,8 @@ export async function apply(ctx, config) {
         reloadConfig()
         if (next.webEnabled) remoteServer.start()
         else remoteServer.stop()
-        if (next.tunnelEnabled && next.webEnabled) {
-          setTimeout(() => tunnel.start(), 1200).unref?.()
-        } else {
-          tunnel.stop(true)
-        }
+        // 外网只走 Tailscale Funnel：收掉可能残留的 cloudflared 隧道
+        tunnel.stop(true)
         // 清空固定地址后自动重新识别；顺便修复 Funnel，保证地址固定
         void ensureStablePublicUrl()
         sendJson(res, 200, { ok: true, state: snapshot() })
