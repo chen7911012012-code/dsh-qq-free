@@ -2877,7 +2877,7 @@ export async function apply(ctx, config) {
     return { list: state.groupPages }
   }
 
-  async function sayGroupPage(token, text) {
+  async function sayGroupPage(token, text, mention = '') {
     const resolved = resolveGroupPage(token)
     if (resolved.status !== 'ok') throw new Error(resolved.status === 'expired' ? '链接已过期' : '分群网页不存在')
     if (resolved.page.permissions.say !== true) {
@@ -2885,7 +2885,11 @@ export async function apply(ctx, config) {
       error.statusCode = 403
       throw error
     }
-    const results = await sendTargets(`group:${resolved.page.group.openid}`, text, { kind: 'group-page' })
+    const target = String(mention ?? '').trim()
+    if (target.length > 0 && !/^[A-Za-z0-9_-]{8,}$/.test(target)) throw new Error('@成员 openid 不合法')
+    const results = await sendTargets(`group:${resolved.page.group.openid}`, text, target.length > 0
+      ? { kind: 'group-page', mention: target }
+      : { kind: 'group-page' })
     return results
   }
 
@@ -2955,7 +2959,12 @@ export async function apply(ctx, config) {
     if (action === 'say' || action === 'generate') {
       const text = action === 'say' ? String(body.text ?? '') : await composeLine(String(body.topic ?? ''))
       if (text.trim().length === 0) throw new Error('消息不能为空')
-      const results = await sendTargets(`group:${groupOpenid}`, text, { kind: 'group-page' })
+      // 分群网页可以 @ 本群成员；openid 只做格式校验，名字由发送逻辑自己查
+      const mention = String(body.mention ?? '').trim()
+      if (mention.length > 0 && !/^[A-Za-z0-9_-]{8,}$/.test(mention)) throw new Error('@成员 openid 不合法')
+      const results = await sendTargets(`group:${groupOpenid}`, text, mention.length > 0
+        ? { kind: 'group-page', mention }
+        : { kind: 'group-page' })
       return { results }
     }
     if (action === 'media') {
