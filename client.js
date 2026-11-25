@@ -798,8 +798,37 @@ window.__ModuleLoader__.load({
         if (result !== null) flash('ok', '已取消该群屏蔽。')
       }
 
-      async function saveAnnouncement() {
-        const result = await run('announcement', () => request('/qq-free/announcements', {
+      async function publishPageAnnouncement() {
+        const result = await run('page-announcement', () => request('/qq-free/page-announcements', {
+          action: 'add',
+          text: paForm.text,
+          mode: paForm.mode,
+          groups: paForm.groups,
+        }))
+        if (result !== null) {
+          setPaForm({ text: '', mode: paForm.mode, groups: paForm.groups })
+          flash('ok', '分群网页公告已发布。')
+        }
+      }
+
+      async function togglePageAnnouncement(entry) {
+        const result = await run(`page-announcement-${entry.id}`, () => request('/qq-free/page-announcements', {
+          action: 'toggle',
+          id: entry.id,
+          active: entry.active === false,
+        }))
+        if (result !== null) flash('ok', entry.active === false ? '公告已启用。' : '公告已停用。')
+      }
+
+      async function removePageAnnouncement(entry) {
+        const result = await run(`page-announcement-${entry.id}`, () => request('/qq-free/page-announcements', {
+          action: 'remove',
+          id: entry.id,
+        }))
+        if (result !== null) flash('ok', '已删除分群网页公告。')
+      }
+
+      async function saveAnnouncement() {        const result = await run('announcement', () => request('/qq-free/announcements', {
           action: 'save',
           name: annForm.name,
           groupOpenids: annForm.groups,
