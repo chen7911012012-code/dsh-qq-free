@@ -329,6 +329,8 @@ export async function apply(ctx, config) {
     const rowConfig = pickConfig(config ?? {})
     const fileConfig = pickConfig(readJson(CONFIG_FILE, {}))
     liveConfig = { ...DEFAULT_CONFIG, ...rowConfig, ...fileConfig }
+    // 外网链接统一走 Tailscale Funnel 固定域名，cloudflared 临时隧道一律不启用
+    liveConfig.tunnelEnabled = false
     credentialSource = rowConfig.appId && rowConfig.appSecret ? 'profile' : fileConfig.appId && fileConfig.appSecret ? 'panel' : null
     // 环境变量作为凭据兜底（与官方 QQ 插件使用同一组变量名）
     if (!liveConfig.appId && typeof process.env.QQBOT_APPID === 'string') liveConfig.appId = process.env.QQBOT_APPID.trim()
@@ -348,12 +350,10 @@ export async function apply(ctx, config) {
   /** 没有固定地址时，临时隧道地址也能让手机打开（会随重启变化）。 */
   let runningTunnelUrl = () => ''
 
-  /** 网页对外的基础地址：固定公网地址 > 运行中的临时隧道 > 局域网地址。 */
+  /** 网页对外的基础地址：只认固定公网地址（Tailscale Funnel），没有就退回局域网。 */
   function siteBaseUrl() {
     const configured = String(liveConfig.publicBaseUrl || '').trim()
     if (configured.length > 0) return configured
-    const tunnelUrl = String(runningTunnelUrl() || '').trim()
-    if (tunnelUrl.length > 0) return tunnelUrl.replace(/\/+$/, '')
     return lanBaseUrl(Number(liveConfig.webPort) || 8788)
   }
 
@@ -3163,15 +3163,9 @@ export async function apply(ctx, config) {
   }
 
   ctx.effect(() => {
-    let timer = null
-    if (liveConfig.tunnelEnabled) {
-      timer = setTimeout(() => tunnel.start(), 1200)
-      timer.unref?.()
-    }
-    return () => {
-      if (timer !== null) clearTimeout(timer)
-      tunnel.stop()
-    }
+    // 不再启动 cloudflared：旧版本留下的隧道进程直接收掉，保证对外只有 Funnel 固定域名
+    tunnel.stop(true)
+    return () => tunnel.stop(true)
   }, 'qq-free.tunnel')
 
   // 固定公网地址：识别到 Tailscale Funnel 的固定域名后写进配置，之后重启不再变化
@@ -4352,8 +4346,8 @@ export async function apply(ctx, config) {
           if (!Number.isFinite(port)) throw new Error('端口不合法')
           next.webPort = Math.max(1024, Math.min(65535, Math.round(port)))
         }
-        if ('tunnelEnabled' in body) next.tunnelEnabled = body.tunnelEnabled === true
-        if (typeof body.tunnelBin === 'string') next.tunnelBin = body.tunnelBin.trim()
+        if ('tunnelEnabled' in body) next.tunnelEnabled = false
+        if (typeof body.tunnelBin === 'string') next.tunnelBin = ''
         if ('publicBaseUrl' in body) {
           const raw = String(body.publicBaseUrl ?? '').trim()
           const normalized = normalizeBaseUrl(raw)
