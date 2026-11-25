@@ -345,10 +345,15 @@ export async function apply(ctx, config) {
     return next
   }
 
-  /** 网页对外的基础地址：固定公网地址优先，其次局域网地址。 */
+  /** 没有固定地址时，临时隧道地址也能让手机打开（会随重启变化）。 */
+  let runningTunnelUrl = () => ''
+
+  /** 网页对外的基础地址：固定公网地址 > 运行中的临时隧道 > 局域网地址。 */
   function siteBaseUrl() {
     const configured = String(liveConfig.publicBaseUrl || '').trim()
     if (configured.length > 0) return configured
+    const tunnelUrl = String(runningTunnelUrl() || '').trim()
+    if (tunnelUrl.length > 0) return tunnelUrl.replace(/\/+$/, '')
     return lanBaseUrl(Number(liveConfig.webPort) || 8788)
   }
 
@@ -3152,6 +3157,10 @@ export async function apply(ctx, config) {
     getConfig: () => liveConfig,
     logger,
   })
+  runningTunnelUrl = () => {
+    const status = tunnel.status()
+    return status.running ? String(status.url || '') : ''
+  }
 
   ctx.effect(() => {
     let timer = null
