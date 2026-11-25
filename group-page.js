@@ -248,14 +248,15 @@ $('sayBtn').onclick = async () => {
   $('sayBtn').disabled = true;
   $('sayText').readOnly = true;
   try {
-    const ok = await act('say', { text });
+    const ok = await act('say', { text, mention: $('mention').value || '' });
     if (ok) $('sayText').value = '';
   } finally {
     $('sayBtn').disabled = false;
     $('sayText').readOnly = false;
   }
 };
-$('genBtn').onclick = () => act('generate', { topic: $('topic').value });$('joinList').onclick = (event) => {
+$('memberRefresh').onclick = () => { void load(); toast('已刷新成员列表', true); };
+$('genBtn').onclick = () => act('generate', { topic: $('topic').value, mention: $('mention').value || '' });$('joinList').onclick = (event) => {
   const button = event.target.closest('button[data-join]');
   if (!button) return;
   act('join-approve', { memberOpenid: button.dataset.id, approve: button.dataset.join === 'approve' });
