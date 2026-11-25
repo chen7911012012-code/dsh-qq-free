@@ -92,13 +92,15 @@
 
 启用步骤：勾选「启用远程网页」，端口默认 8788，保存/启动；token 留空会自动生成，也可点「重新生成 token」。面板会列出带 token 的访问地址（本机 + 局域网 IP）。
 
+**地址固定（重启不变）**：面板「固定公网地址」填一个 `https://` 地址后，主网页和分群网页的链接、token、端口都会写进配置，DSH 重启不会改变。留空时插件会自动识别 `tailscale funnel status`，把 Tailscale Funnel 的 MagicDNS 固定域名（`https://<主机名>.<tailnet>.ts.net`）写进配置。cloudflared quick tunnel（`https://xxx.trycloudflare.com`）每次重启都会换域名，只作为没有固定地址时的临时兜底；分群网页链接一律用服务端算好的绝对地址，不会再出现相对路径 `/g/<token>` 打不开的情况。
+
 安全提醒：
 
 - 默认是**局域网使用**：监听 `0.0.0.0:8788`，同一 Wi-Fi 的设备用 `http://<这台电脑的局域网IP>:8788/?token=...` 访问；Windows 防火墙需放行入站 TCP 8788。
 - 页面是 **HTTP 明文**，token 就是密码；**不要直接把 8788 端口转发/映射到公网**，否则 token 会裸奔。
 - 外网使用请安装下面任意一种：
-  1. **Tailscale（推荐）**：主机和手机都安装 Tailscale，登录同一账号，手机访问 `http://<主机 Tailscale IP>:8788/?token=...`；加密、不用端口转发。
-  2. **Cloudflare Tunnel**：主机安装 `cloudflared`，运行 `cloudflared tunnel --url http://127.0.0.1:8788`，会得到一个 `https://xxx.trycloudflare.com` 地址；要固定域名就做 named tunnel。
+  1. **Tailscale（推荐）**：主机和手机都安装 Tailscale，登录同一账号，手机访问 `http://<主机 Tailscale IP>:8788/?token=...` 或 `https://<主机名>.<tailnet>.ts.net/?token=...`（用 `tailscale funnel 8788` 开启，域名跨重启固定）；加密、不用端口转发。
+  2. **Cloudflare Tunnel**：主机安装 `cloudflared`，运行 `cloudflared tunnel --url http://127.0.0.1:8788`，会得到一个 `https://xxx.trycloudflare.com` 地址；要固定域名就做 named tunnel 并把地址填进「固定公网地址」。
   3. **frp / ngrok**：把 8788 映射到带 HTTPS 的公网地址，并设置强 token。
 - 换 token 后旧链接立即失效。
 
