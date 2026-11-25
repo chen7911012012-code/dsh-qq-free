@@ -1477,12 +1477,7 @@ window.__ModuleLoader__.load({
                   placeholder: '留空自动识别 Tailscale Funnel，例如 https://xxx.tail1234.ts.net',
                   onChange: (event) => setRemoteForm({ ...remoteForm, publicBaseUrl: event.target.value }),
                 })),
-              h('label', { className: 'qqf-row' },
-                h('input', {
-                  type: 'checkbox', checked: remoteForm?.tunnelEnabled === true,
-                  onChange: (event) => setRemoteForm({ ...remoteForm, tunnelEnabled: event.target.checked }),
-                }),
-                h('span', null, '临时 cloudflared 隧道（应急用；地址每次重启都会变，有固定公网地址时不要勾）')),
+              h('p', { className: 'qqf-hint' }, '外网访问统一走 Tailscale Funnel 固定域名：主网页和分群网页都是这个域名，重启不变；cloudflared 临时隧道已停用。'),
               h('div', { className: 'qqf-row' },
                 h('button', {
                   className: 'qqf-btn qqf-btn--primary', disabled: busy !== '',
@@ -1504,12 +1499,6 @@ window.__ModuleLoader__.load({
                   data.remote?.publicUrlDetect?.lastError
                     ? `还没有固定公网地址：${data.remote.publicUrlDetect.lastError}`
                     : '还没有固定公网地址，正在识别 Tailscale Funnel…'),
-              data.remote?.tunnel?.url && data.remote?.tunnel?.running
-                ? h('p', { className: 'qqf-mono' }, `临时隧道（会变）：${data.remote.tunnel.url}`)
-                : null,
-              data.remote?.tunnel?.lastError
-                ? h('p', { className: 'qqf-hint' }, `隧道错误：${data.remote.tunnel.lastError}`)
-                : null,
               data.remote?.urls && data.remote.urls.length > 0
                 ? h('div', null,
                   h('p', { className: 'qqf-hint' }, '局域网地址（同一 Wi-Fi 用）：'),
