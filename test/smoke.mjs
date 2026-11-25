@@ -774,6 +774,28 @@ const gpPageHtml = await httpCall(`${remoteBase}/g/${encodeURIComponent(groupTok
 check('分群网页有 @ 成员选择框和「获取信息」注意事项', gpPageHtml.status === 200 && gpPageHtml.text.includes('id="mention"') && gpPageHtml.text.includes('获取信息') && gpPageHtml.text.includes('刷新成员'))
 check('网页用 no-cache 校验，升级后刷新即生效', gpPageHtml.headers['cache-control'] === 'no-cache', String(gpPageHtml.headers['cache-control']))
 check('分群网页返回可 @ 的成员列表', (gpOverview.json().members || []).some((member) => member.openid === 'ASKER1' && String(member.name || '').length > 0), JSON.stringify((gpOverview.json().members || []).slice(0, 3)))
+
+// 分群网页公告：面板/主网页发布 → 分群网页 overview 展示 → 停用/删除后消失
+const paAdd = await call('/qq-free/page-announcements', 'POST', { action: 'add', text: '分群网页公告测试', mode: 'once', groups: [GROUP] })
+check('发布分群网页公告', paAdd.status === 200 && paAdd.body.state.pageAnnouncements.length === 1 && paAdd.body.state.pageAnnouncements[0].mode === 'once')
+check('分群网页页面有公告容器', (await httpCall(`${remoteBase}/g/${encodeURIComponent(groupToken)}`)).text.includes('id="announcements"'))
+const paOverview = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
+check('分群网页能读到公告', (paOverview.json().pageAnnouncements || []).some((item) => item.text === '分群网页公告测试'))
+const paOther = await call('/qq-free/page-announcements', 'POST', { action: 'add', text: '别的群的公告', mode: 'always', groups: ['OTHERGROUPOPENID1'] })
+check('公告可以只投放到指定群', paOther.status === 200 && !(paOverview = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)).json().pageAnnouncements.some((item) => item.text === '别的群的公告'))
+const paToggle = await call('/qq-free/page-announcements', 'POST', { action: 'toggle', id: paAdd.body.entry.id, active: false })
+check('停用公告后分群网页不再显示', paToggle.status === 200 && !(await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)).json().pageAnnouncements.some((item) => item.text === '分群网页公告测试'))
+const paRemoteAdd = await httpCall(`${remoteBase}/api/pageAnnouncements`, {
+  method: 'POST', headers: { authorization: 'Bearer test12', 'content-type': 'application/json' },
+  body: { action: 'add', text: '主网页发布的公告', mode: 'once', groups: [] },
+})
+check('主网页也能发布分群网页公告', paRemoteAdd.status === 200 && paRemoteAdd.json().ok === true)
+const paAllGroups = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
+check('不选群的公告在所有分群网页显示', (paAllGroups.json().pageAnnouncements || []).some((item) => item.text === '主网页发布的公告'))
+await call('/qq-free/page-announcements', 'POST', { action: 'remove', id: paAdd.body.entry.id })
+await call('/qq-free/page-announcements', 'POST', { action: 'remove', id: paOther.body.entry.id })
+const paClean = await call('/qq-free/page-announcements', 'POST', { action: 'list' })
+check('公告可删除', paClean.status === 200 && paClean.body.list.length === 1 && paClean.body.list[0].text === '主网页发布的公告')
 await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: false, joinApprove: false, memberManage: false, settings: false, expiresAt: '' })
 const gpJoinDenied = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'join-approve', memberOpenid: 'MEMBERX1', approve: true },
