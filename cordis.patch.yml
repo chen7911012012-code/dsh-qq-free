@@ -58,3 +58,4 @@
         inactiveCleanupMaxLevel: 1
         tunnelEnabled: false
         tunnelBin: ''
+        publicBaseUrl: ''
