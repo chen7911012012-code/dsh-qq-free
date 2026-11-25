@@ -332,6 +332,7 @@ window.__ModuleLoader__.load({
             port: data.remote.port || 8788,
             token: data.remote.token || '',
             tunnelEnabled: data.remote.tunnel?.enabled === true,
+            publicBaseUrl: data.remote.publicUrl || '',
           })
         }
         if (modForm === null && data.moderation) {
@@ -653,12 +654,19 @@ window.__ModuleLoader__.load({
           port: Number(remoteForm.port) || 8788,
           token: remoteForm.token,
           tunnelEnabled: remoteForm.tunnelEnabled === true,
+          publicBaseUrl: remoteForm.publicBaseUrl ?? '',
           ...(regenerate ? { regenerate: true } : {}),
         }))
         if (result !== null) {
           const remote = result.state?.remote
           if (remote) {
-            setRemoteForm({ enabled: remote.enabled, port: remote.port, token: remote.token })
+            setRemoteForm({
+              enabled: remote.enabled,
+              port: remote.port,
+              token: remote.token,
+              tunnelEnabled: remote.tunnel?.enabled === true,
+              publicBaseUrl: remote.publicUrl || '',
+            })
           }
           flash('ok', regenerate ? '已生成新 token。' : '远程发言设置已保存。')
         }
@@ -1463,12 +1471,18 @@ window.__ModuleLoader__.load({
                   placeholder: '6 位字母/数字，留空自动生成',
                   onChange: (event) => setRemoteForm({ ...remoteForm, token: event.target.value }),
                 })),
+              h('label', { className: 'qqf-field qqf-field--full' }, h('span', null, '固定公网地址（重启后不变）'),
+                h('input', {
+                  className: 'qqf-input', value: remoteForm?.publicBaseUrl ?? '',
+                  placeholder: '留空自动识别 Tailscale Funnel，例如 https://xxx.tail1234.ts.net',
+                  onChange: (event) => setRemoteForm({ ...remoteForm, publicBaseUrl: event.target.value }),
+                })),
               h('label', { className: 'qqf-row' },
                 h('input', {
                   type: 'checkbox', checked: remoteForm?.tunnelEnabled === true,
                   onChange: (event) => setRemoteForm({ ...remoteForm, tunnelEnabled: event.target.checked }),
                 }),
-                h('span', null, '自动启动公网隧道（cloudflared，DSH 重启后自动恢复）')),
+                h('span', null, '额外启动 cloudflared 隧道（地址每次重启都会变，只在没有固定地址时用）')),
               h('div', { className: 'qqf-row' },
                 h('button', {
                   className: 'qqf-btn qqf-btn--primary', disabled: busy !== '',
@@ -1481,15 +1495,24 @@ window.__ModuleLoader__.load({
                 h('span', { className: 'qqf-hint' },
                   data.remote?.running ? `运行中 · 端口 ${data.remote.port}` : '未运行')),
               data.remote?.lastError ? h('p', { className: 'qqf-hint' }, `最近错误：${data.remote.lastError}`) : null,
+              data.remote?.publicUrls && data.remote.publicUrls.length > 0
+                ? h('div', null,
+                  h('p', { className: 'qqf-hint' }, '固定公网地址（手机书签就用这个，重启不变）：'),
+                  data.remote.publicUrls.map((url) => h('p', { key: url, className: 'qqf-mono' },
+                    h('a', { href: url, target: '_blank', rel: 'noreferrer', style: { color: 'inherit' } }, url))))
+                : h('p', { className: 'qqf-hint' },
+                  data.remote?.publicUrlDetect?.lastError
+                    ? `还没有固定公网地址：${data.remote.publicUrlDetect.lastError}`
+                    : '还没有固定公网地址，正在识别 Tailscale Funnel…'),
               data.remote?.tunnel?.url
-                ? h('p', { className: 'qqf-mono' }, `公网隧道：${data.remote.tunnel.url}`)
+                ? h('p', { className: 'qqf-mono' }, `临时隧道（会变）：${data.remote.tunnel.url}`)
                 : null,
               data.remote?.tunnel?.lastError
                 ? h('p', { className: 'qqf-hint' }, `隧道错误：${data.remote.tunnel.lastError}`)
                 : null,
               data.remote?.urls && data.remote.urls.length > 0
                 ? h('div', null,
-                  h('p', { className: 'qqf-hint' }, '用下面的地址打开（带 token，可直接复制到手机）：'),
+                  h('p', { className: 'qqf-hint' }, '局域网地址（同一 Wi-Fi 用）：'),
                   data.remote.urls.map((url) => h('p', { key: url, className: 'qqf-mono' },
                     h('a', { href: url, target: '_blank', rel: 'noreferrer', style: { color: 'inherit' } }, url))))
                 : null),
