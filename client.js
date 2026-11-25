@@ -1504,7 +1504,7 @@ window.__ModuleLoader__.load({
                   data.remote?.publicUrlDetect?.lastError
                     ? `还没有固定公网地址：${data.remote.publicUrlDetect.lastError}`
                     : '还没有固定公网地址，正在识别 Tailscale Funnel…'),
-              data.remote?.tunnel?.url
+              data.remote?.tunnel?.url && data.remote?.tunnel?.running
                 ? h('p', { className: 'qqf-mono' }, `临时隧道（会变）：${data.remote.tunnel.url}`)
                 : null,
               data.remote?.tunnel?.lastError
