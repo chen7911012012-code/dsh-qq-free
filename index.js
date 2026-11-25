@@ -2752,8 +2752,10 @@ export async function apply(ctx, config) {
       })
       return { saved: true }
     },
-    async qa(body) {
-      const action = String(body.action ?? 'list')
+    pageAnnouncements(body) {
+      return handlePageAnnouncements(body)
+    },
+    async qa(body) {      const action = String(body.action ?? 'list')
       if (action === 'add') {
         const saved = addQaEntry({
           question: body.question,
@@ -2968,6 +2970,11 @@ export async function apply(ctx, config) {
         .map((item) => ({ ...item, name: memberDisplayName(item.name, item.openid) })),
       managers: state.groupManagers.filter((item) => item.groupOpenid === groupOpenid),
       announcements: state.announcements.filter((item) => Array.isArray(item.groupOpenids) && item.groupOpenids.includes(groupOpenid)),
+      // 只给本分群网页展示的公告；groups 为空表示所有分群网页
+      pageAnnouncements: state.pageAnnouncements
+        .filter((item) => item.active !== false
+          && (!Array.isArray(item.groups) || item.groups.length === 0 || item.groups.includes(groupOpenid)))
+        .slice(-5),
       welcome: {
         enabled: liveConfig.welcomeEnabled === true && (welcomeGroups.length === 0 || welcomeGroups.includes(groupOpenid)),
         text: liveConfig.welcomeText || '',
@@ -3621,6 +3628,7 @@ export async function apply(ctx, config) {
       groupBlocks: state.groupBlocks.slice(-200),
       featureBlocks: state.featureBlocks.slice(-500),
       announcements: state.announcements.slice(-50),
+      pageAnnouncements: state.pageAnnouncements.slice(-50),
       groupManagers: state.groupManagers.slice(-200),
       groupPages: state.groupPages.map((item) => ({
         ...item,
@@ -4143,6 +4151,17 @@ export async function apply(ctx, config) {
           sendJson(res, 200, { ok: true, ...(await result), state: snapshot() })
           return
         }
+        sendJson(res, 200, { ok: true, ...result, state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/qq-free/page-announcements',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const result = handlePageAnnouncements(body)
         sendJson(res, 200, { ok: true, ...result, state: snapshot() })
       }),
     }))
