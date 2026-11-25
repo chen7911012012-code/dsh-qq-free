@@ -214,6 +214,7 @@ export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMe
           blockedMentions: state.blockedMentions,
           fortune: state.fortune,
           fortunes: state.fortunes,
+          pageAnnouncements: state.pageAnnouncements,
           log: state.log,
         })
         return
