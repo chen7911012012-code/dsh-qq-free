@@ -1482,7 +1482,7 @@ window.__ModuleLoader__.load({
                   type: 'checkbox', checked: remoteForm?.tunnelEnabled === true,
                   onChange: (event) => setRemoteForm({ ...remoteForm, tunnelEnabled: event.target.checked }),
                 }),
-                h('span', null, '额外启动 cloudflared 隧道（地址每次重启都会变，只在没有固定地址时用）')),
+                h('span', null, '临时 cloudflared 隧道（应急用；地址每次重启都会变，有固定公网地址时不要勾）')),
               h('div', { className: 'qqf-row' },
                 h('button', {
                   className: 'qqf-btn qqf-btn--primary', disabled: busy !== '',
