@@ -66,8 +66,10 @@ function json(res, status, body) {
 function html(req, res, status, body, cacheable = true) {
   const raw = Buffer.from(body, 'utf8')
   const etag = `"${createHash('sha1').update(raw).digest('hex')}"`
+  // 页面内容会随插件升级变化，用 no-cache + ETag：每次都回源校验，变了就立刻生效
+  const cacheControl = cacheable ? 'no-cache' : 'no-store'
   if (cacheable && req.headers['if-none-match'] === etag) {
-    res.writeHead(304, { etag, 'cache-control': 'public, max-age=3600' })
+    res.writeHead(304, { etag, 'cache-control': cacheControl })
     res.end()
     return
   }
@@ -75,7 +77,7 @@ function html(req, res, status, body, cacheable = true) {
   const compressed = /\bgzip\b/.test(accept)
   res.writeHead(status, {
     'content-type': 'text/html; charset=utf-8',
-    'cache-control': cacheable ? 'public, max-age=3600' : 'no-store',
+    'cache-control': cacheControl,
     etag,
     vary: 'Accept-Encoding',
     ...(compressed ? { 'content-encoding': 'gzip' } : {}),
