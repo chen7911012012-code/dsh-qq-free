@@ -71,6 +71,7 @@ section{display:none}section.on{display:block}
     <div class="card">
       <h2>DeepSeek 代写</h2>
       <input id="topic" placeholder="输入主题，让 DeepSeek 写一句发到群里">
+      <p class="muted">会沿用上面「@ 群成员」里选中的成员。</p>
       <div class="row" style="margin-top:8px"><button id="genBtn">生成并发送</button></div>
     </div>
   </section>
