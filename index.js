@@ -24,6 +24,7 @@ import { createRemoteServer } from './remote.js'
 import { createCloudSync } from './cloud.js'
 import { createGitHubSync } from './github.js'
 import { createTunnel } from './tunnel.js'
+import { detectTailscaleBaseUrl, findTailscaleBinary, joinBaseUrl, normalizeBaseUrl } from './public-url.js'
 import { renderVerificationImage } from './verification-image.js'
 
 export const name = 'qq-free'
@@ -116,6 +117,8 @@ const DEFAULT_CONFIG = {
   inactiveCleanupMaxLevel: 1,
   tunnelEnabled: false,
   tunnelBin: '',
+  // 固定的公网基础地址（如 https://xxx.tail1234.ts.net），留空自动识别 Tailscale Funnel
+  publicBaseUrl: '',
 }
 
 const EDITABLE_KEYS = new Set(Object.keys(DEFAULT_CONFIG))
@@ -216,6 +219,9 @@ function pickConfig(input) {
       out[key] = value === true || value === 'true'
     } else if (key === 'tunnelEnabled') {
       out[key] = value === true || value === 'true'
+    } else if (key === 'publicBaseUrl') {
+      // 只接受 http(s) 地址；填错时存空串，交给自动识别兜底
+      out[key] = normalizeBaseUrl(value)
     } else {
       out[key] = String(value).slice(0, key === 'appSecret' ? 256 : 4000)
     }
