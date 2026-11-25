@@ -511,6 +511,41 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
     })
 
     $('remoteInfo').textContent = '远程服务：' + (state.remote ? (state.remote.running ? '运行中 · 端口 ' + state.remote.port : '未运行') : '未知') + ' · 回复日志：' + (state.replyLogPath || '')
+
+    var paGroups = $('paGroups'); paGroups.innerHTML = ''
+    state.targets.filter(function (t) { return t.scope === 'group' }).forEach(function (t) {
+      var label = document.createElement('label'); label.className = 'row'
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.style.flex = '0 0 auto'; cb.checked = paPick.indexOf(t.openid) >= 0
+      cb.onchange = function () {
+        var i = paPick.indexOf(t.openid)
+        if (i >= 0) paPick.splice(i, 1)
+        else paPick.push(t.openid)
+        render()
+      }
+      var span = document.createElement('span'); span.textContent = t.name
+      label.appendChild(cb); label.appendChild(span); paGroups.appendChild(label)
+    })
+
+    var paList = $('paList'); paList.innerHTML = ''
+    var pageAnns = (state.pageAnnouncements || []).slice().reverse()
+    pageAnns.forEach(function (a) {
+      var div = document.createElement('div'); div.className = 'item'
+      var main = document.createElement('div'); main.className = 'item-main'
+      var q = document.createElement('div'); q.className = 'q'
+      q.textContent = (a.mode === 'always' ? '每次都显示' : '仅显示一次') + (a.active === false ? '（已停用）' : '') + ' · ' + new Date(a.createdAt).toLocaleString('zh-CN', { hour12: false })
+      var meta = document.createElement('div'); meta.className = 'mono'
+      meta.textContent = (a.groups && a.groups.length > 0)
+        ? a.groups.map(function (openid) { var t = state.targets.filter(function (x) { return x.openid === openid })[0]; return t ? t.name : openid }).join(' / ')
+        : '所有分群网页'
+      var body = document.createElement('div'); body.className = 'muted'; body.textContent = a.text
+      main.appendChild(q); main.appendChild(meta); main.appendChild(body)
+      var actions = document.createElement('div'); actions.className = 'item-actions'
+      var toggle = document.createElement('button'); toggle.className = 'sm ghost'; toggle.textContent = a.active === false ? '启用' : '停用'
+      toggle.onclick = function () { post('/api/pageAnnouncements', { action: 'toggle', id: a.id, active: a.active === false }).then(function () { notice($('paNotice'), '已更新', 'ok') }).catch(function (e) { notice($('paNotice'), e.message, 'err') }) }
+      var del = document.createElement('button'); del.className = 'sm danger'; del.textContent = '删除'
+      del.onclick = function () { post('/api/pageAnnouncements', { action: 'remove', id: a.id }).then(function () { notice($('paNotice'), '已删除', 'ok') }).catch(function (e) { notice($('paNotice'), e.message, 'err') }) }
+      actions.appendChild(toggle); actions.appendChild(del); div.appendChild(main); div.appendChild(actions); paList.appendChild(div)
+    })
   }
 
   async function sendText() {
