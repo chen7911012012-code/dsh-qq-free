@@ -2183,8 +2183,8 @@ window.__ModuleLoader__.load({
               data.groupPages && data.groupPages.length > 0
                 ? h('ul', { className: 'qqf-targets' },
                   data.groupPages.map((entry) => {
-                    const base = String(data.remote?.tunnel?.url || '').replace(/\/+$/, '')
-                    const url = base.length > 0 ? `${base}/g/${entry.token}` : `/g/${entry.token}`
+                    const base = String(data.remote?.publicUrl || data.remote?.tunnel?.url || '').replace(/\/+$/, '')
+                    const url = entry.url || (base.length > 0 ? `${base}/g/${entry.token}` : `/g/${entry.token}`)
                     return h('li', { key: entry.groupOpenid, className: 'qqf-target' },
                       h('div', { className: 'qqf-target-main' },
                         h('span', { className: 'qqf-target-name' }, `${entry.groupName || entry.groupOpenid} · ${entry.permissions?.say ? '可发言' : '只读'}`),
