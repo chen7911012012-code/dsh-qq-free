@@ -209,7 +209,9 @@ function renderAnnouncements() {
     card.className = 'card ann-card';
     const title = document.createElement('div');
     title.className = 'ann-title';
-    title.textContent = '公告' + (item.createdAt ? '' : '');
+    title.textContent = item.createdAt
+      ? ('公告 · ' + new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false }))
+      : '公告';
     const text = document.createElement('div');
     text.className = 'ann-text';
     text.textContent = item.text || '';
