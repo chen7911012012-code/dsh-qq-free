@@ -24,7 +24,7 @@ import { createRemoteServer } from './remote.js'
 import { createCloudSync } from './cloud.js'
 import { createGitHubSync } from './github.js'
 import { createTunnel } from './tunnel.js'
-import { detectTailscaleBaseUrl, findTailscaleBinary, joinBaseUrl, normalizeBaseUrl } from './public-url.js'
+import { detectTailscaleBaseUrl, ensureTailscaleFunnel, findTailscaleBinary, joinBaseUrl, normalizeBaseUrl } from './public-url.js'
 import { renderVerificationImage } from './verification-image.js'
 
 export const name = 'qq-free'
