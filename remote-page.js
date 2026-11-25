@@ -256,6 +256,22 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
       </div>
 
       <div class="card">
+        <strong style="font-size:14px">分群网页公告</strong>
+        <label>公告内容<textarea id="paText" placeholder="只显示在分群网页顶部，不会发到 QQ 群"></textarea></label>
+        <label>显示方式
+          <select id="paMode">
+            <option value="once">仅显示一次（点「知道了」下次不显示）</option>
+            <option value="always">每次都显示</option>
+          </select>
+        </label>
+        <div class="muted">不选群 = 所有分群网页都显示</div>
+        <div id="paGroups" class="list"></div>
+        <button id="paPublish">发布公告</button>
+        <div class="notice hidden" id="paNotice"></div>
+        <div class="list" id="paList"></div>
+      </div>
+
+      <div class="card">
         <strong style="font-size:14px">远程信息</strong>
         <div class="muted" id="remoteInfo"></div>
       </div>
@@ -269,6 +285,7 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
   var state = null
   var mediaFile = null
   var boardPick = []
+  var paPick = []
   var $ = function (id) { return document.getElementById(id) }
   function headers() { return { 'authorization': 'Bearer ' + token, 'content-type': 'application/json' } }
   function notice(el, text, kind) { el.className = 'notice' + (kind ? ' ' + kind : ''); el.textContent = text; el.classList.remove('hidden') }
