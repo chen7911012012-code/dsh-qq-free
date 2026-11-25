@@ -64,6 +64,7 @@ function httpCall(url, options = {}) {
       response.on('end', () => resolve({
         status: response.statusCode,
         text,
+        headers: response.headers,
         json: () => JSON.parse(text),
       }))
     })
@@ -769,6 +770,7 @@ const gpOverview = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURI
 check('分群网页可读完整管理数据', gpOverview.status === 200 && gpOverview.json().ok === true && Array.isArray(gpOverview.json().features))
 const gpPageHtml = await httpCall(`${remoteBase}/g/${encodeURIComponent(groupToken)}`)
 check('分群网页有 @ 成员选择框和「获取信息」注意事项', gpPageHtml.status === 200 && gpPageHtml.text.includes('id="mention"') && gpPageHtml.text.includes('获取信息') && gpPageHtml.text.includes('刷新成员'))
+check('网页用 no-cache 校验，升级后刷新即生效', gpPageHtml.headers['cache-control'] === 'no-cache', String(gpPageHtml.headers['cache-control']))
 check('分群网页返回可 @ 的成员列表', (gpOverview.json().members || []).some((member) => member.openid === 'ASKER1' && String(member.name || '').length > 0), JSON.stringify((gpOverview.json().members || []).slice(0, 3)))
 await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: false, joinApprove: false, memberManage: false, settings: false, expiresAt: '' })
 const gpJoinDenied = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
