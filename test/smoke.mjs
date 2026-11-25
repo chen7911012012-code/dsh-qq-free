@@ -785,17 +785,19 @@ const gpAllowed = await httpCall(`${remoteBase}/gapi/say?token=${encodeURICompon
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { text: '分群网页发言测试' },
 })
 check('分群有权限可发言', gpAllowed.status === 200 || String(gpAllowed.json().error ?? '').includes('上限'))
+await call('/qq-free/config', 'POST', { dailyLimit: 0 })
 const gpMention = await httpCall(`${remoteBase}/gapi/say?token=${encodeURIComponent(groupToken)}`, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { text: '分群网页 @ 成员测试', mention: 'MENTIONASKER1' },
 })
 const gpMentionFrame = sent.filter((item) => item.method === 'POST'
   && item.target.endsWith(`/v2/groups/${GROUP}/messages`)
   && String(item.body?.markdown?.content ?? '').includes('分群网页 @ 成员测试')).at(-1)
-check('分群网页可 @ 指定成员', gpMention.status === 200 && String(gpMentionFrame?.body?.markdown?.content ?? '').includes('<qqbot-at-user id="MENTIONASKER1"/>'), JSON.stringify(gpMentionFrame?.body))
+check('分群网页可 @ 指定成员', gpMention.status === 200 && String(gpMentionFrame?.body?.markdown?.content ?? '').includes('<qqbot-at-user id="MENTIONASKER1"/>'), `${gpMention.status} ${JSON.stringify(gpMention.json())}`)
 const gpBadMention = await httpCall(`${remoteBase}/gapi/say?token=${encodeURIComponent(groupToken)}`, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { text: '越权 @', mention: '12345' },
 })
 check('分群网页 @ 成员 openid 不合法会报错', gpBadMention.status === 400 && /openid/.test(String(gpBadMention.json().error ?? '')), JSON.stringify(gpBadMention.json()))
+await call('/qq-free/config', 'POST', { dailyLimit: 10 })
 const mainStill = await httpCall(`${remoteBase}/api/state`, { headers: { authorization: 'Bearer test12' } })
 check('主网页不受分群权限限制', mainStill.status === 200)
 const gpChatBlock = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
