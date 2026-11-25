@@ -1883,6 +1883,70 @@ window.__ModuleLoader__.load({
                 : h('p', { className: 'qqf-empty' }, '还没有定时公告。')),
 
             h(Card, {
+              title: '分群网页公告',
+              wide: true,
+              hint: '只显示在分群网页顶部，不会发到 QQ 群。不选群 = 所有分群网页都会显示。「仅显示一次」：访客点过「知道了」后，这台设备下次打开不再显示；「每次都显示」：直到删除或停用。',
+            },
+              h('textarea', {
+                className: 'qqf-textarea', value: paForm.text, maxLength: 2000,
+                placeholder: '公告内容，例如：本群网页 8 月 1 日起改用新地址……',
+                onChange: (event) => setPaForm({ ...paForm, text: event.target.value }),
+              }),
+              groupTargets.length === 0
+                ? h('p', { className: 'qqf-empty' }, '还没有群目标，公告会显示在所有分群网页。')
+                : h('div', { className: 'qqf-row' },
+                  groupTargets.map((target) => h('label', { key: target.id, className: 'qqf-row' },
+                    h('input', {
+                      type: 'checkbox', checked: paForm.groups.includes(target.openid),
+                      onChange: (event) => setPaForm({
+                        ...paForm,
+                        groups: event.target.checked
+                          ? [...new Set([...paForm.groups, target.openid])]
+                          : paForm.groups.filter((item) => item !== target.openid),
+                      }),
+                    }),
+                    h('span', null, target.name)))),
+              h('p', { className: 'qqf-hint' }, paForm.groups.length === 0 ? '不选群 = 所有分群网页' : `只在选中的 ${paForm.groups.length} 个分群网页显示`),
+              h('div', { className: 'qqf-row' },
+                h('label', { className: 'qqf-row' },
+                  h('input', {
+                    type: 'radio', name: 'paMode', checked: paForm.mode === 'once',
+                    onChange: () => setPaForm({ ...paForm, mode: 'once' }),
+                  }),
+                  h('span', null, '仅显示一次（点「知道了」下次不显示）')),
+                h('label', { className: 'qqf-row' },
+                  h('input', {
+                    type: 'radio', name: 'paMode', checked: paForm.mode === 'always',
+                    onChange: () => setPaForm({ ...paForm, mode: 'always' }),
+                  }),
+                  h('span', null, '每次都显示'))),
+              h('button', {
+                className: 'qqf-btn qqf-btn--primary', disabled: busy !== '' || paForm.text.trim() === '',
+                onClick: () => void publishPageAnnouncement(),
+              }, busy === 'page-announcement' ? '发布中…' : '发布分群网页公告'),
+              data.pageAnnouncements && data.pageAnnouncements.length > 0
+                ? h('ul', { className: 'qqf-targets' },
+                  data.pageAnnouncements.slice().reverse().map((entry) => h('li', { key: entry.id, className: 'qqf-target' },
+                    h('div', { className: 'qqf-target-main' },
+                      h('span', { className: 'qqf-target-name' },
+                        `${entry.mode === 'always' ? '每次都显示' : '仅显示一次'}${entry.active === false ? '（已停用）' : ''} · ${new Date(entry.createdAt).toLocaleString('zh-CN', { hour12: false })}`),
+                      h('span', { className: 'qqf-mono' },
+                        (entry.groups || []).length === 0
+                          ? '所有分群网页'
+                          : (entry.groups || []).map((openid) => groupTargets.find((target) => target.openid === openid)?.name || openid).join(' / ')),
+                      h('span', { className: 'qqf-mono' }, entry.text)),
+                    h('div', { className: 'qqf-row' },
+                      h('button', {
+                        className: 'qqf-btn qqf-btn--sm qqf-btn--ghost', disabled: busy !== '',
+                        onClick: () => void togglePageAnnouncement(entry),
+                      }, entry.active === false ? '启用' : '停用'),
+                      h('button', {
+                        className: 'qqf-btn qqf-btn--sm qqf-btn--danger', disabled: busy !== '',
+                        onClick: () => void removePageAnnouncement(entry),
+                      }, '删除')))))
+                : h('p', { className: 'qqf-empty' }, '还没有分群网页公告。')),
+
+            h(Card, {
               title: '群板块（一次发多个群）',
               wide: true,
               hint: '把 1–3 个群建成一个板块；发送/生成/媒体/自动发言选中板块就会一次发到所有群。',
