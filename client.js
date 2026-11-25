@@ -256,6 +256,8 @@ window.__ModuleLoader__.load({
       const [fbGroup, setFbGroup] = useState('')
       const [annForm, setAnnForm] = useState({ name: '', groups: [], date: '', time: '09:00', text: '', enabled: true })
       const [annImage, setAnnImage] = useState(null)
+      // 分群网页公告：只在分群网页上显示，可选「仅显示一次」
+      const [paForm, setPaForm] = useState({ text: '', mode: 'once', groups: [] })
       const [ownerId, setOwnerId] = useState(null)
       const [gmGroup, setGmGroup] = useState('')
       const [gmMember, setGmMember] = useState('')
