@@ -331,7 +331,6 @@ window.__ModuleLoader__.load({
             enabled: data.remote.enabled === true,
             port: data.remote.port || 8788,
             token: data.remote.token || '',
-            tunnelEnabled: data.remote.tunnel?.enabled === true,
             publicBaseUrl: data.remote.publicUrl || '',
           })
         }
@@ -653,7 +652,6 @@ window.__ModuleLoader__.load({
           enabled: remoteForm.enabled,
           port: Number(remoteForm.port) || 8788,
           token: remoteForm.token,
-          tunnelEnabled: remoteForm.tunnelEnabled === true,
           publicBaseUrl: remoteForm.publicBaseUrl ?? '',
           ...(regenerate ? { regenerate: true } : {}),
         }))
@@ -664,7 +662,6 @@ window.__ModuleLoader__.load({
               enabled: remote.enabled,
               port: remote.port,
               token: remote.token,
-              tunnelEnabled: remote.tunnel?.enabled === true,
               publicBaseUrl: remote.publicUrl || '',
             })
           }
@@ -2172,7 +2169,7 @@ window.__ModuleLoader__.load({
               data.groupPages && data.groupPages.length > 0
                 ? h('ul', { className: 'qqf-targets' },
                   data.groupPages.map((entry) => {
-                    const base = String(data.remote?.publicUrl || data.remote?.tunnel?.url || '').replace(/\/+$/, '')
+                    const base = String(data.remote?.publicUrl || '').replace(/\/+$/, '')
                     const url = entry.url || (base.length > 0 ? `${base}/g/${entry.token}` : `/g/${entry.token}`)
                     return h('li', { key: entry.groupOpenid, className: 'qqf-target' },
                       h('div', { className: 'qqf-target-main' },
