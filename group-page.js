@@ -41,10 +41,14 @@ label.check input{width:auto}
 .tabs button{background:transparent;color:var(--muted);border:1px solid var(--line)}
 .tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 section{display:none}section.on{display:block}
+.ann-card{border-left:4px solid var(--accent);padding:12px 14px}
+.ann-title{font-weight:700;font-size:13px;color:var(--accent);margin-bottom:4px}
+.ann-text{white-space:pre-wrap;word-break:break-word}
 </style>
 </head>
 <body>
 <main>
+  <div id="announcements"></div>
   <div class="card">
     <h1 id="groupName">分群管理</h1>
     <div class="muted" id="meta"></div>
@@ -190,7 +194,47 @@ $('tabs').addEventListener('click', (event) => {
 });
 const FEATURE_LABELS = { auto:'自主发言', welcome:'入群欢迎', joinNotice:'入群申请通知', joinRequest:'入群申请处理', joinVerify:'入群人机验证', commands:'群管理命令', moderation:'违禁词', info:'获取信息' };
 const CHAT_FEATURES = ['chat', 'auto'];
+// 分群网页公告：mode=once 的公告点过「知道了」后本设备不再显示
+function renderAnnouncements() {
+  const box = $('announcements');
+  if (!box) return;
+  box.innerHTML = '';
+  const list = (data && data.pageAnnouncements) || [];
+  for (const item of list) {
+    const key = 'qqfree-ann-' + item.id;
+    if (item.mode !== 'always') {
+      try { if (localStorage.getItem(key) === '1') continue; } catch (e) { /* 隐私模式忽略 */ }
+    }
+    const card = document.createElement('div');
+    card.className = 'card ann-card';
+    const title = document.createElement('div');
+    title.className = 'ann-title';
+    title.textContent = '公告' + (item.createdAt ? '' : '');
+    const text = document.createElement('div');
+    text.className = 'ann-text';
+    text.textContent = item.text || '';
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.style.marginTop = '8px';
+    const btn = document.createElement('button');
+    btn.className = 'sm';
+    btn.textContent = item.mode === 'always' ? '知道了' : '知道了（本次不再显示）';
+    btn.onclick = () => {
+      if (item.mode !== 'always') {
+        try { localStorage.setItem(key, '1'); } catch (e) { /* ignore */ }
+      }
+      card.remove();
+    };
+    row.appendChild(btn);
+    card.appendChild(title);
+    card.appendChild(text);
+    card.appendChild(row);
+    box.appendChild(card);
+  }
+}
 function render() {
+  if (!data) return;
+  renderAnnouncements();
   $('groupName').textContent = data.group.name || '分群管理';
   $('meta').textContent = (data.expiresAt ? ('有效期至 ' + new Date(data.expiresAt).toLocaleString('zh-CN', { hour12:false })) : '长期有效');
   const p = data.permissions || {};
