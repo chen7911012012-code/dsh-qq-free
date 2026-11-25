@@ -662,6 +662,14 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
       .catch(function (e) { notice($('boardNotice'), e.message, 'err') })
   }
 
+  $('paPublish').onclick = function () {
+    var text = $('paText').value.trim()
+    if (!text) { notice($('paNotice'), '公告内容不能为空', 'err'); return }
+    post('/api/pageAnnouncements', { action: 'add', text: text, mode: $('paMode').value, groups: paPick.slice() })
+      .then(function () { $('paText').value = ''; paPick = []; notice($('paNotice'), '已发布到分群网页', 'ok') })
+      .catch(function (e) { notice($('paNotice'), e.message, 'err') })
+  }
+
   document.querySelectorAll('.tab').forEach(function (btn) {
     btn.onclick = function () {
       document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('on', b === btn) })
