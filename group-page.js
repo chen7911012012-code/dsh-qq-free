@@ -227,12 +227,12 @@ function render() {
   $('cleanupOn').checked = data.cleanup?.enabled === true;
   $('cleanupTime').value = data.cleanup?.time || '03:00';
   $('cleanupDays').value = data.cleanup?.days || 30;
-  $('managerList').innerHTML = (data.managers || []).map((item) => '<li class="item"><div>' + (item.name || item.memberOpenid) + '<div class="muted">' + item.memberOpenid + '</div></div><button class="sm danger" data-manager-del="' + item.memberOpenid + '">取消</button></li>').join('');
+  $('managerList').innerHTML = (data.managers || []).map((item) => '<li class="item"><div>' + esc(item.name || item.memberOpenid) + '<div class="muted">' + esc(item.memberOpenid) + '</div></div><button class="sm danger" data-manager-del="' + esc(item.memberOpenid) + '">取消</button></li>').join('');
   $('fortuneOn').checked = data.fortune?.enabled === true;
   const fortunes = data.fortune?.records || [];
-  $('fortuneList').innerHTML = fortunes.map((item) => '<li class="item"><div><div>' + (item.name || item.memberOpenid) + '</div><div class="muted">' + item.date + '</div></div><div class="muted">' + (item.fortune || '') + '</div></li>').join('');
+  $('fortuneList').innerHTML = fortunes.map((item) => '<li class="item"><div><div>' + esc(item.name || item.memberOpenid) + '</div><div class="muted">' + esc(item.date) + '</div></div><div class="muted">' + esc(item.fortune || '') + '</div></li>').join('');
   $('fortuneEmpty').style.display = fortunes.length ? 'none' : 'block';
-  $('annList').innerHTML = (data.announcements || []).map((item) => '<li class="item"><div><div>' + (item.name || '公告') + ' · ' + (item.date || '每天') + ' ' + item.time + '</div><div class="muted">' + item.text + '</div></div><div class="row"><button class="sm" data-ann-run="' + item.id + '">立即发</button><button class="sm danger" data-ann-del="' + item.id + '">删除</button></div></li>').join('');
+  $('annList').innerHTML = (data.announcements || []).map((item) => '<li class="item"><div><div>' + esc(item.name || '公告') + ' · ' + esc(item.date || '每天') + ' ' + esc(item.time) + '</div><div class="muted">' + esc(item.text) + '</div></div><div class="row"><button class="sm" data-ann-run="' + esc(item.id) + '">立即发</button><button class="sm danger" data-ann-del="' + esc(item.id) + '">删除</button></div></li>').join('');
 }
 async function load() {
   try {
