@@ -782,9 +782,11 @@ check('分群网页页面有公告容器', (await httpCall(`${remoteBase}/g/${en
 const paOverview = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
 check('分群网页能读到公告', (paOverview.json().pageAnnouncements || []).some((item) => item.text === '分群网页公告测试'))
 const paOther = await call('/qq-free/page-announcements', 'POST', { action: 'add', text: '别的群的公告', mode: 'always', groups: ['OTHERGROUPOPENID1'] })
-check('公告可以只投放到指定群', paOther.status === 200 && !(paOverview = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)).json().pageAnnouncements.some((item) => item.text === '别的群的公告'))
+const paScoped = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
+check('公告可以只投放到指定群', paOther.status === 200 && !(paScoped.json().pageAnnouncements || []).some((item) => item.text === '别的群的公告'))
 const paToggle = await call('/qq-free/page-announcements', 'POST', { action: 'toggle', id: paAdd.body.entry.id, active: false })
-check('停用公告后分群网页不再显示', paToggle.status === 200 && !(await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)).json().pageAnnouncements.some((item) => item.text === '分群网页公告测试'))
+const paAfterToggle = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
+check('停用公告后分群网页不再显示', paToggle.status === 200 && !(paAfterToggle.json().pageAnnouncements || []).some((item) => item.text === '分群网页公告测试'))
 const paRemoteAdd = await httpCall(`${remoteBase}/api/pageAnnouncements`, {
   method: 'POST', headers: { authorization: 'Bearer test12', 'content-type': 'application/json' },
   body: { action: 'add', text: '主网页发布的公告', mode: 'once', groups: [] },
