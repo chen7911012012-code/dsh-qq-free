@@ -3210,9 +3210,31 @@ export async function apply(ctx, config) {
     }
   }
 
+  /** 启动/保存时先把 Funnel 修好（机器重启、Tailscale 重装后配置可能丢失），地址保持同一个。 */
+  async function ensureStablePublicUrl() {
+    if (liveConfig.webEnabled !== true) return
+    const port = Number(liveConfig.webPort) || 8788
+    try {
+      const funnel = await ensureTailscaleFunnel(port)
+      publicBaseDetect.binary = findTailscaleBinary()
+      if (funnel.applied && funnel.ok) {
+        appendLog({
+          at: new Date().toISOString(), scope: 'system', name: '公网地址',
+          text: `已自动把 Tailscale Funnel 指回 127.0.0.1:${port}`, ok: true, kind: 'public-url',
+        })
+        logger.info(`qq-free: 已自动恢复 Tailscale Funnel → 127.0.0.1:${port}`)
+      } else if (!funnel.ok && funnel.reason) {
+        publicBaseDetect.lastError = `Tailscale Funnel 不可用：${funnel.reason}`
+      }
+    } catch (error) {
+      publicBaseDetect.lastError = error instanceof Error ? error.message : String(error)
+    }
+    await refreshPublicBaseUrl()
+  }
+
   ctx.effect(() => {
     if (liveConfig.webEnabled !== true) return () => {}
-    const first = setTimeout(() => { void refreshPublicBaseUrl() }, 2000)
+    const first = setTimeout(() => { void ensureStablePublicUrl() }, 2000)
     const timer = setInterval(() => { void refreshPublicBaseUrl() }, 5 * 60_000)
     first.unref?.()
     timer.unref?.()
@@ -4362,8 +4384,8 @@ export async function apply(ctx, config) {
         } else {
           tunnel.stop(true)
         }
-        // 清空固定地址后自动重新识别（地址固定后不会再变）
-        void refreshPublicBaseUrl()
+        // 清空固定地址后自动重新识别；顺便修复 Funnel，保证地址固定
+        void ensureStablePublicUrl()
         sendJson(res, 200, { ok: true, state: snapshot() })
       }),
     }))
