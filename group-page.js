@@ -197,11 +197,27 @@ function render() {
     ['say','发言',p.say],['joinApprove','审批',p.joinApprove],['memberManage','成员',p.memberManage],['settings','设置',p.settings],
   ].map(([key,label,on]) => '<span class="badge ' + (on ? '' : 'off') + '">' + label + (on ? ' 可用' : ' 无权限') + '</span>').join('');
   const joins = data.pendingJoins || [];
-  $('joinList').innerHTML = joins.map((item) => '<li class="item"><div><div>' + (item.username || item.memberOpenid) + '</div><div class="muted">' + item.memberOpenid + '</div></div><div class="row"><button class="sm" data-join="approve" data-id="' + item.memberOpenid + '">同意</button><button class="sm danger" data-join="decline" data-id="' + item.memberOpenid + '">拒绝</button></div></li>').join('');
+  $('joinList').innerHTML = joins.map((item) => '<li class="item"><div><div>' + esc(item.username || item.memberOpenid) + '</div><div class="muted">' + esc(item.memberOpenid) + '</div></div><div class="row"><button class="sm" data-join="approve" data-id="' + esc(item.memberOpenid) + '">同意</button><button class="sm danger" data-join="decline" data-id="' + esc(item.memberOpenid) + '">拒绝</button></div></li>').join('');
   $('joinEmpty').style.display = joins.length ? 'none' : 'block';
   const members = data.members || [];
-  $('memberList').innerHTML = members.map((item) => '<li class="item"><div><div>' + (item.name || item.openid) + '</div><div class="muted">' + item.openid + ' · ' + (item.role || 'member') + '</div></div><div class="row"><button class="sm" data-mute="' + item.openid + '">禁言60分</button><button class="sm ghost" data-unmute="' + item.openid + '">解禁</button><button class="sm danger" data-kick="' + item.openid + '">踢人</button></div></li>').join('');
+  $('memberList').innerHTML = members.map((item) => '<li class="item"><div><div>' + esc(item.name || item.openid) + '</div><div class="muted">' + esc(item.openid) + ' · ' + esc(item.role || 'member') + '</div></div><div class="row"><button class="sm" data-mute="' + esc(item.openid) + '">禁言60分</button><button class="sm ghost" data-unmute="' + esc(item.openid) + '">解禁</button><button class="sm danger" data-kick="' + esc(item.openid) + '">踢人</button></div></li>').join('');
   $('memberEmpty').style.display = members.length ? 'none' : 'block';
+  // @ 成员下拉：只列本群已知成员，按 openid 去重，保留当前选择
+  const mention = $('mention');
+  const keepMention = mention.value;
+  mention.innerHTML = '<option value="">不 @ 成员</option>';
+  const mentioned = new Set();
+  for (const item of members) {
+    const openid = String(item.openid || '');
+    if (openid.length === 0 || mentioned.has(openid)) continue;
+    mentioned.add(openid);
+    const label = item.name && String(item.name).trim().length > 0 ? item.name : ('成员' + openid.slice(-6));
+    const option = document.createElement('option');
+    option.value = openid;
+    option.textContent = '@' + label;
+    mention.appendChild(option);
+  }
+  if (keepMention.length > 0 && mentioned.has(keepMention)) mention.value = keepMention;
   $('featureGrid').innerHTML = (data.features || []).filter((key) => !CHAT_FEATURES.includes(key)).map((key) => '<label class="check"><input type="checkbox" data-feature="' + key + '" ' + ((data.blocks?.features || []).includes(key) ? '' : 'checked') + '> ' + (FEATURE_LABELS[key] || key) + '</label>').join('') + '<label class="check"><input type="checkbox" data-feature="__all" ' + (data.blocks?.all ? 'checked' : '') + '> 全部屏蔽</label>';
   $('aiChatOn').checked = data.blocks?.all !== true && !(data.blocks?.features || []).includes('chat');
   $('autoOn').checked = data.blocks?.all !== true && !(data.blocks?.features || []).includes('auto');
