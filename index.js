@@ -409,6 +409,12 @@ export async function apply(ctx, config) {
     ? state.groupPages.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.token === 'string').slice(-100)
     : []
   state.fortunes = state.fortunes !== null && typeof state.fortunes === 'object' ? state.fortunes : {}
+  // 分群网页公告：只展示在分群网页上，可选「仅显示一次」
+  state.pageAnnouncements = Array.isArray(state.pageAnnouncements)
+    ? state.pageAnnouncements
+      .filter((item) => item && typeof item.id === 'string' && typeof item.text === 'string')
+      .slice(-50)
+    : []
 
   // 网页密码只补齐空值，绝不因重启重置已保存的 token
   const usedWebPasswords = new Set()
@@ -2457,6 +2463,54 @@ export async function apply(ctx, config) {
       return runAnnouncements(String(body.id ?? ''))
     }
     return { list: state.announcements }
+  }
+
+  /**
+   * 分群网页公告：面板 / 主网页发布，分群网页打开时展示。
+   * mode=once 表示每个访客看过并点「知道了」后本设备不再显示（存 localStorage），
+   * mode=always 表示直到删除/停用前每次打开都显示。
+   */
+  function handlePageAnnouncements(body) {
+    const action = String(body.action ?? 'list')
+    if (action === 'add') {
+      const text = String(body.text ?? '').trim()
+      if (text.length === 0) throw new Error('公告内容不能为空')
+      const groups = Array.isArray(body.groups)
+        ? [...new Set(body.groups.map((item) => String(item).trim()).filter(Boolean))].slice(0, 50)
+        : []
+      const entry = {
+        id: `pa-${Date.now().toString(36)}-${randomInt(1000, 9999).toString(36)}`,
+        text: text.slice(0, 2000),
+        groups,
+        mode: body.mode === 'always' ? 'always' : 'once',
+        active: true,
+        createdBy: String(body.createdBy ?? '').slice(0, 40),
+        createdAt: new Date().toISOString(),
+      }
+      state.pageAnnouncements.push(entry)
+      if (state.pageAnnouncements.length > 50) state.pageAnnouncements = state.pageAnnouncements.slice(-50)
+      persistState()
+      appendLog({
+        at: new Date().toISOString(), scope: 'system', name: '分群网页公告',
+        text: `发布公告：${entry.text.slice(0, 40)}`, ok: true, kind: 'page-announcement',
+      })
+      return { entry }
+    }
+    if (action === 'toggle') {
+      const id = String(body.id ?? '')
+      const entry = state.pageAnnouncements.find((item) => item.id === id)
+      if (!entry) throw new Error('公告不存在')
+      entry.active = body.active === true
+      persistState()
+      return { entry }
+    }
+    if (action === 'remove') {
+      const id = String(body.id ?? '')
+      state.pageAnnouncements = state.pageAnnouncements.filter((item) => item.id !== id)
+      persistState()
+      return { removed: true }
+    }
+    return { list: state.pageAnnouncements }
   }
 
   async function handleGroupAdmin(body) {
