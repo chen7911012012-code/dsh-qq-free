@@ -3135,7 +3135,7 @@ export async function apply(ctx, config) {
     api: remoteApi,
     groupPage: {
       resolve: (token) => resolveGroupPage(token),
-      say: (token, text) => sayGroupPage(token, text),
+      say: (token, text, mention) => sayGroupPage(token, text, mention),
       overview: (token) => groupPageOverview(token),
       action: (token, action, body) => groupPageAction(token, action, body),
     },
