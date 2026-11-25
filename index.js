@@ -3544,6 +3544,8 @@ export async function apply(ctx, config) {
       groupPages: state.groupPages.map((item) => ({
         ...item,
         groupName: state.targets.find((target) => target.scope === 'group' && target.openid === item.groupOpenid)?.name ?? '',
+        // 服务端算好完整链接，避免前端用相对路径（重启后也不会变）
+        url: siteLink(`g/${item.token}`),
       })),
       fortune: {
         enabled: liveConfig.fortuneEnabled === true,
@@ -3596,6 +3598,11 @@ export async function apply(ctx, config) {
         port: Number(liveConfig.webPort) || 8788,
         token: liveConfig.webToken || '',
         urls: remoteUrls(Number(liveConfig.webPort) || 8788, liveConfig.webToken || ''),
+        publicUrl: String(liveConfig.publicBaseUrl || '').trim(),
+        publicUrls: String(liveConfig.publicBaseUrl || '').trim().length > 0
+          ? [joinBaseUrl(liveConfig.publicBaseUrl, `?token=${encodeURIComponent(liveConfig.webToken || '')}`)]
+          : [],
+        publicUrlDetect: { ...publicBaseDetect },
         ...remoteServer.status(),
         tunnel: tunnel.status(),
       },
@@ -4307,6 +4314,14 @@ export async function apply(ctx, config) {
         }
         if ('tunnelEnabled' in body) next.tunnelEnabled = body.tunnelEnabled === true
         if (typeof body.tunnelBin === 'string') next.tunnelBin = body.tunnelBin.trim()
+        if ('publicBaseUrl' in body) {
+          const raw = String(body.publicBaseUrl ?? '').trim()
+          const normalized = normalizeBaseUrl(raw)
+          if (raw.length > 0 && normalized.length === 0) {
+            throw new Error('固定公网地址必须以 http:// 或 https:// 开头')
+          }
+          next.publicBaseUrl = normalized
+        }
         if (body.regenerate === true) {
           next.webToken = uniqueWebPassword(new Set(state.groupPages.map((item) => String(item.token || ''))))
         } else if (typeof body.token === 'string' && body.token.trim().length > 0) {
@@ -4329,6 +4344,8 @@ export async function apply(ctx, config) {
         } else {
           tunnel.stop(true)
         }
+        // 清空固定地址后自动重新识别（地址固定后不会再变）
+        void refreshPublicBaseUrl()
         sendJson(res, 200, { ok: true, state: snapshot() })
       }),
     }))
