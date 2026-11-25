@@ -345,6 +345,18 @@ export async function apply(ctx, config) {
     return next
   }
 
+  /** 网页对外的基础地址：固定公网地址优先，其次局域网地址。 */
+  function siteBaseUrl() {
+    const configured = String(liveConfig.publicBaseUrl || '').trim()
+    if (configured.length > 0) return configured
+    return lanBaseUrl(Number(liveConfig.webPort) || 8788)
+  }
+
+  /** 主网页 / 分群网页的完整链接（重启后保持不变）。 */
+  function siteLink(pathname) {
+    return joinBaseUrl(siteBaseUrl(), pathname)
+  }
+
   let state = readJson(STATE_FILE, {})
   if (state === null || typeof state !== 'object') state = {}
   state.targets = Array.isArray(state.targets) ? state.targets.filter((t) => t && typeof t.openid === 'string') : []
@@ -3143,6 +3155,54 @@ export async function apply(ctx, config) {
       tunnel.stop()
     }
   }, 'qq-free.tunnel')
+
+  // 固定公网地址：识别到 Tailscale Funnel 的固定域名后写进配置，之后重启不再变化
+  const publicBaseDetect = { detected: '', lastError: '', checkedAt: 0, binary: '' }
+  let publicBaseBusy = false
+
+  async function refreshPublicBaseUrl() {
+    if (publicBaseBusy) return
+    if (liveConfig.webEnabled !== true) return
+    if (String(liveConfig.publicBaseUrl || '').trim().length > 0) return
+    publicBaseBusy = true
+    try {
+      const port = Number(liveConfig.webPort) || 8788
+      publicBaseDetect.binary = findTailscaleBinary()
+      publicBaseDetect.checkedAt = Date.now()
+      const detected = await detectTailscaleBaseUrl(port, publicBaseDetect.binary)
+      if (detected.length === 0) {
+        publicBaseDetect.lastError = publicBaseDetect.binary.length === 0
+          ? '未找到 tailscale，可在「固定公网地址」里手动填写'
+          : `Tailscale Funnel 未指向 127.0.0.1:${port}（可执行 tailscale funnel ${port}）`
+        return
+      }
+      publicBaseDetect.detected = detected
+      publicBaseDetect.lastError = ''
+      if (String(liveConfig.publicBaseUrl || '').trim() === detected) return
+      saveConfigPatch({ publicBaseUrl: detected })
+      appendLog({
+        at: new Date().toISOString(), scope: 'system', name: '公网地址',
+        text: `固定公网地址：${detected}`, ok: true, kind: 'public-url',
+      })
+      logger.info(`qq-free: 固定公网地址 ${detected}`)
+    } catch (error) {
+      publicBaseDetect.lastError = error instanceof Error ? error.message : String(error)
+    } finally {
+      publicBaseBusy = false
+    }
+  }
+
+  ctx.effect(() => {
+    if (liveConfig.webEnabled !== true) return () => {}
+    const first = setTimeout(() => { void refreshPublicBaseUrl() }, 2000)
+    const timer = setInterval(() => { void refreshPublicBaseUrl() }, 5 * 60_000)
+    first.unref?.()
+    timer.unref?.()
+    return () => {
+      clearTimeout(first)
+      clearInterval(timer)
+    }
+  }, 'qq-free.public-url')
 
   const githubSync = createGitHubSync({
     pluginDir: PLUGIN_DIR,
