@@ -61,6 +61,10 @@ section{display:none}section.on{display:block}
   <section id="tab-say" class="on">
     <div class="card">
       <h2>机器人发言</h2>
+      <label class="muted" for="mention">@ 群成员（可选）</label>
+      <select id="mention"><option value="">不 @ 成员</option></select>
+      <div class="row" style="margin-top:8px"><button class="ghost sm" id="memberRefresh">刷新成员</button></div>
+      <p class="muted" id="mentionHint">注意事项：如果这里没有要 @ 的群成员，说明机器人还没记录到他。请先在群里 @机器人 发送「获取信息」，让机器人记录成员，再回到本页点「刷新成员」；群友在群里说过话后也会自动被记录。</p>
       <textarea id="sayText" placeholder="要发送到本群的内容…"></textarea>
       <div class="row" style="margin-top:8px"><button id="sayBtn">发送</button></div>
     </div>
@@ -144,6 +148,8 @@ section{display:none}section.on{display:block}
 <script>
 const TOKEN = ${JSON.stringify(safe)};
 const $ = (id) => document.getElementById(id);
+// 昵称来自群成员，直接拼进 innerHTML 会被当成标签，统一转义
+const esc = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 let data = null;
 function toast(message, ok) {
   const box = $('notice');
