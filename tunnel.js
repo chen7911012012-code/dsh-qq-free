@@ -227,10 +227,13 @@ export function createTunnel({ dataDir, getConfig, logger }) {
     status() {
       const pid = adoptedPid > 0 ? adoptedPid : readPid()
       const running = child !== null || (pid > 0 && alive(pid))
+      const enabled = getConfig().tunnelEnabled === true
+      // 隧道关了/进程已死时不要再把日志里的旧地址当成有效地址，否则面板会把
+      // 每个链接都拼到一个已经解析不了的 trycloudflare 域名上
       return {
-        enabled: getConfig().tunnelEnabled === true,
+        enabled,
         running,
-        url: lastUrl || readUrl(),
+        url: enabled || running ? (lastUrl || readUrl()) : '',
         restarts,
         lastError,
         binary: resolveBinary(),
