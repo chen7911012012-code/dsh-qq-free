@@ -567,6 +567,45 @@ if (ws) {
     && sent.some((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.content?.includes('第 3 次')))
   check('踢出后违规次数清零', (await call('/qq-free/state')).body.moderation.strikes.every((entry) => entry.memberOpenid !== 'BADUSER1'))
 
+  // 自定义处罚次数：第几次禁言 / 第几次踢出
+  result = await call('/qq-free/config', 'POST', { moderationMuteAfter: 1, moderationKickAfter: 3 })
+  check('自定义违规次数保存成功', result.status === 200
+    && result.body.state.moderation.muteAfter === 1
+    && result.body.state.moderation.kickAfter === 3, JSON.stringify(result.body.state.moderation))
+  const badThreshold = await call('/qq-free/config', 'POST', { moderationMuteAfter: 5, moderationKickAfter: 3 })
+  check('踢出次数必须大于禁言次数', badThreshold.status === 400 && /大于/.test(String(badThreshold.body.error)), JSON.stringify(badThreshold.body))
+
+  const emitBad2 = (id, content) => ws.emit({
+    op: 0, s: 40 + Number(id.slice(-1)), t: 'GROUP_MESSAGE_CREATE',
+    d: { id, content, group_openid: GROUP, mentions: [], author: { member_openid: 'BADUSER2', member_nickname: '二犯', member_role: 'member' } },
+  })
+  const kickedBad2 = () => sent.some((item) => item.method === 'POST' && item.target.includes('/batch_remove_members') && item.body?.member_openids?.includes('BADUSER2'))
+  emitBad2('EV-BAD5', '又来坏词')
+  await sleep(150)
+  check('自定义第 1 次即禁言', sent.some((item) => item.method === 'POST' && item.target.includes('/restrict_chat_setting')
+    && item.body?.members?.[0]?.member_openid === 'BADUSER2') && !kickedBad2())
+  emitBad2('EV-BAD6', '继续坏词')
+  await sleep(150)
+  check('未到踢出次数时只禁言不踢', !kickedBad2())
+  emitBad2('EV-BAD7', '第三次坏词')
+  await sleep(150)
+  check('达到自定义踢出次数后踢出', kickedBad2())
+
+  await call('/qq-free/config', 'POST', { moderationMuteAfter: 0, moderationKickAfter: 2 })
+  const emitBad3 = (id) => ws.emit({
+    op: 0, s: 50 + Number(id.slice(-1)), t: 'GROUP_MESSAGE_CREATE',
+    d: { id, content: '坏词三号', group_openid: GROUP, mentions: [], author: { member_openid: 'BADUSER3', member_nickname: '三犯', member_role: 'member' } },
+  })
+  const mutedBad3 = () => sent.some((item) => item.method === 'POST' && item.target.includes('/restrict_chat_setting') && item.body?.members?.[0]?.member_openid === 'BADUSER3')
+  emitBad3('EV-BAD8')
+  await sleep(150)
+  check('禁言次数设为 0 时第 1 次只警告', !mutedBad3())
+  emitBad3('EV-BAD9')
+  await sleep(150)
+  check('禁言关闭时达到踢出次数直接踢出', sent.some((item) => item.method === 'POST' && item.target.includes('/batch_remove_members') && item.body?.member_openids?.includes('BADUSER3')))
+  await call('/qq-free/config', 'POST', { moderationMuteAfter: 2, moderationKickAfter: 3 })
+
+
   const beforeAdminBad = sent.length
   emitBad('EV-BAD4', '管理员也发坏词', 'admin')
   await sleep(100)
@@ -779,6 +818,16 @@ check('分群网页返回可 @ 的成员列表', (gpOverview.json().members || [
 const paAdd = await call('/qq-free/page-announcements', 'POST', { action: 'add', text: '分群网页公告测试', mode: 'once', groups: [GROUP] })
 check('发布分群网页公告', paAdd.status === 200 && paAdd.body.state.pageAnnouncements.length === 1 && paAdd.body.state.pageAnnouncements[0].mode === 'once')
 check('分群网页页面有公告容器', (await httpCall(`${remoteBase}/g/${encodeURIComponent(groupToken)}`)).text.includes('id="announcements"'))
+
+// 违禁词处罚次数：分群网页只显示，不能修改
+check('分群网页展示处罚次数', (await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)).json().moderationPolicy?.muteAfter === 2
+  && (await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)).json().moderationPolicy?.kickAfter === 3
+  && (await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)).json().moderationPolicy?.muteMinutes === 5)
+check('分群网页有处罚次数的只读展示位', (await httpCall(`${remoteBase}/g/${encodeURIComponent(groupToken)}`)).text.includes('id="modPolicy"'))
+const gpModEdit = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'moderation-save', muteAfter: 1, kickAfter: 2 },
+})
+check('分群网页不能修改处罚次数', gpModEdit.status === 400 && /未知操作/.test(String(gpModEdit.json().error)), JSON.stringify(gpModEdit.json()))
 const paOverview = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
 check('分群网页能读到公告', (paOverview.json().pageAnnouncements || []).some((item) => item.text === '分群网页公告测试'))
 const paOther = await call('/qq-free/page-announcements', 'POST', { action: 'add', text: '别的群的公告', mode: 'always', groups: ['OTHERGROUPOPENID1'] })
