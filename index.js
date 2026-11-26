@@ -2996,6 +2996,12 @@ export async function apply(ctx, config) {
       ...resolved.page,
       features: GROUP_FEATURES,
       blocks: { all: block.all === true, features: Array.isArray(block.features) ? block.features : [] },
+      // 分群网页只展示处罚次数，不能修改（改次数只在 DSH 面板 / 主网页）
+      moderationPolicy: {
+        muteAfter: Math.max(0, Math.round(Number(liveConfig.moderationMuteAfter) || 0)),
+        kickAfter: Math.max(0, Math.round(Number(liveConfig.moderationKickAfter) || 0)),
+        muteMinutes: Math.max(1, Math.round(Number(liveConfig.moderationMuteMinutes) || 10)),
+      },
       pendingJoins: state.pendingJoins.filter((item) => item.groupOpenid === groupOpenid),
       members: state.members
         .filter((item) => item.groupOpenid === groupOpenid)
