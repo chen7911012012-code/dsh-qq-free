@@ -342,6 +342,8 @@ window.__ModuleLoader__.load({
             words: (data.moderation.words || []).join('\n'),
             groups: (data.moderation.groups || []).join('\n'),
             muteMinutes: data.moderation.muteMinutes || 10,
+            muteAfter: data.moderation.muteAfter ?? 2,
+            kickAfter: data.moderation.kickAfter ?? 3,
           })
         }
         if (cloudForm === null && data.cloud) {
@@ -703,6 +705,8 @@ window.__ModuleLoader__.load({
           bannedWords: modForm.words.split(/[\n,，、]+/).map((word) => word.trim()).filter(Boolean),
           moderationGroups: modForm.groups.split(/[\n,，、\s]+/).map((group) => group.trim()).filter(Boolean),
           moderationMuteMinutes: Number(modForm.muteMinutes) || 10,
+          moderationMuteAfter: Math.round(Number(modForm.muteAfter) || 0),
+          moderationKickAfter: Math.round(Number(modForm.kickAfter) || 0),
         }))
         if (result !== null) flash('ok', '违禁词设置已保存。')
       }
@@ -2004,11 +2008,24 @@ window.__ModuleLoader__.load({
                   onChange: (event) => setModForm({ ...modForm, groups: event.target.value }),
                 })),
               h('div', { className: 'qqf-row' },
-                h('label', { className: 'qqf-field' }, h('span', null, '第 2 次禁言分钟'),
+                h('label', { className: 'qqf-field' }, h('span', null, '违规几次后禁言（0=不禁言）'),
+                  h('input', {
+                    className: 'qqf-input', type: 'number', min: 0, max: 100, value: modForm?.muteAfter ?? 2,
+                    onChange: (event) => setModForm({ ...modForm, muteAfter: event.target.value }),
+                  })),
+                h('label', { className: 'qqf-field' }, h('span', null, '禁言时长（分钟）'),
                   h('input', {
                     className: 'qqf-input', type: 'number', min: 1, max: 43200, value: modForm?.muteMinutes ?? 10,
                     onChange: (event) => setModForm({ ...modForm, muteMinutes: event.target.value }),
                   })),
+                h('label', { className: 'qqf-field' }, h('span', null, '违规几次后踢出（0=不踢）'),
+                  h('input', {
+                    className: 'qqf-input', type: 'number', min: 0, max: 100, value: modForm?.kickAfter ?? 3,
+                    onChange: (event) => setModForm({ ...modForm, kickAfter: event.target.value }),
+                  }))),
+              h('p', { className: 'qqf-hint' },
+                '踢出次数必须大于禁言次数；填 0 表示不启用该处罚。这两项只能在 DSH 面板和主网页设置，分群网页只显示。'),
+              h('div', { className: 'qqf-row' },
                 h('button', { className: 'qqf-btn qqf-btn--primary', disabled: busy !== '', onClick: () => void saveModeration() },
                   busy === 'moderation' ? '保存中…' : '保存违禁词设置')),
               data.moderation?.strikes && data.moderation.strikes.length > 0
