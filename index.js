@@ -93,6 +93,9 @@ const DEFAULT_CONFIG = {
   moderationGroups: [],
   bannedWords: [],
   moderationMuteMinutes: 10,
+  // 违规第几次禁言 / 第几次踢出；0 表示该处罚不启用
+  moderationMuteAfter: 2,
+  moderationKickAfter: 3,
   cloudEnabled: false,
   cloudUrl: '',
   cloudUser: '',
@@ -208,6 +211,10 @@ function pickConfig(input) {
       const minutes = Number(value)
       if (!Number.isFinite(minutes)) continue
       out[key] = Math.max(1, Math.min(43200, Math.round(minutes)))
+    } else if (key === 'moderationMuteAfter' || key === 'moderationKickAfter') {
+      const times = Number(value)
+      if (!Number.isFinite(times)) continue
+      out[key] = Math.max(0, Math.min(100, Math.round(times)))
     } else if (key === 'moderationEnabled') {
       out[key] = value === true || value === 'true'
     } else if (key === 'joinVerifyEnabled') {
