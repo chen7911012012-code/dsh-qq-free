@@ -354,6 +354,19 @@ export async function apply(ctx, config) {
     return next
   }
 
+  /** 违规处罚次数校验：0 表示不启用该处罚，两个都启用时踢出必须晚于禁言。 */
+  function assertModerationThresholds(muteAfter, kickAfter) {
+    const mute = Math.round(Number(muteAfter) || 0)
+    const kick = Math.round(Number(kickAfter) || 0)
+    if (!Number.isFinite(mute) || !Number.isFinite(kick) || mute < 0 || mute > 100 || kick < 0 || kick > 100) {
+      throw new Error('违规次数需要 0–100 的整数（0 表示不启用该处罚）')
+    }
+    if (mute > 0 && kick > 0 && kick <= mute) {
+      throw new Error('踢出次数必须大于禁言次数，或把其中一个设为 0')
+    }
+    return { mute, kick }
+  }
+
   /** 网页对外的基础地址：只认固定公网地址（Tailscale Funnel），没有就退回局域网。 */
   function siteBaseUrl() {
     const configured = String(liveConfig.publicBaseUrl || '').trim()
@@ -2145,11 +2158,21 @@ export async function apply(ctx, config) {
     }
 
     const name = memberName || memberOpenid
+    const muteAfter = Math.max(0, Math.min(100, Math.round(Number(liveConfig.moderationMuteAfter) || 0)))
+    const kickAfter = Math.max(0, Math.min(100, Math.round(Number(liveConfig.moderationKickAfter) || 0)))
+    const shouldKick = kickAfter > 0 && count >= kickAfter
+    const shouldMute = !shouldKick && muteAfter > 0 && count >= muteAfter
+    const hintParts = []
+    if (!shouldKick && muteAfter > 0 && count < muteAfter) hintParts.push(`再 ${muteAfter - count} 次禁言`)
+    if (!shouldKick && kickAfter > 0 && count < kickAfter) hintParts.push(`再 ${kickAfter - count} 次移出群聊`)
+    const hint = hintParts.length > 0 ? `，${hintParts.join('、')}` : ''
     let reply = ''
     try {
-      if (count === 1) {
-        reply = `⚠️ ${name} 的消息含违禁词，已撤回（第 1 次，再犯将禁言）。`
-      } else if (count === 2) {
+      if (shouldKick) {
+        await groupApi('POST', `${groupPath}/batch_remove_members`, { member_openids: [memberOpenid] })
+        reply = `⚠️ ${name} 的消息含违禁词，已撤回并移出群聊（第 ${count} 次）。`
+        delete state.strikes[key]
+      } else if (shouldMute) {
         const minutes = Math.max(1, Math.min(43200, Number(liveConfig.moderationMuteMinutes) || 10))
         const member = {
           op: 'add',
@@ -2161,11 +2184,9 @@ export async function apply(ctx, config) {
         } catch {
           await groupApi('POST', `${groupPath}/restrict_chat_setting`, { members: [{ ...member, op: 'update' }] })
         }
-        reply = `⚠️ ${name} 的消息含违禁词，已撤回并禁言 ${minutes} 分钟（第 2 次）。`
+        reply = `⚠️ ${name} 的消息含违禁词，已撤回并禁言 ${minutes} 分钟（第 ${count} 次）。`
       } else {
-        await groupApi('POST', `${groupPath}/batch_remove_members`, { member_openids: [memberOpenid] })
-        reply = `⚠️ ${name} 的消息含违禁词，已撤回并移出群聊（第 3 次）。`
-        delete state.strikes[key]
+        reply = `⚠️ ${name} 的消息含违禁词，已撤回（第 ${count} 次${hint}）。`
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -2815,11 +2836,16 @@ export async function apply(ctx, config) {
         persistState()
         return { reset: true }
       }
+      const muteAfter = 'muteAfter' in body ? body.muteAfter : liveConfig.moderationMuteAfter
+      const kickAfter = 'kickAfter' in body ? body.kickAfter : liveConfig.moderationKickAfter
+      assertModerationThresholds(muteAfter, kickAfter)
       saveConfigPatch({
         moderationEnabled: body.enabled === true,
         bannedWords: Array.isArray(body.words) ? body.words : String(body.words ?? '').split(/[\n,，、]+/),
         moderationGroups: Array.isArray(body.groups) ? body.groups : String(body.groups ?? '').split(/[\n,，、\s]+/),
         moderationMuteMinutes: Number(body.muteMinutes) || 10,
+        moderationMuteAfter: Math.round(Number(muteAfter) || 0),
+        moderationKickAfter: Math.round(Number(kickAfter) || 0),
       })
       return { saved: true }
     },
@@ -3680,6 +3706,8 @@ export async function apply(ctx, config) {
         groups: Array.isArray(liveConfig.moderationGroups) ? liveConfig.moderationGroups : [],
         words: Array.isArray(liveConfig.bannedWords) ? liveConfig.bannedWords : [],
         muteMinutes: Number(liveConfig.moderationMuteMinutes) || 10,
+        muteAfter: Math.max(0, Math.round(Number(liveConfig.moderationMuteAfter) || 0)),
+        kickAfter: Math.max(0, Math.round(Number(liveConfig.moderationKickAfter) || 0)),
         strikes: Object.entries(state.strikes)
           .map(([key, value]) => ({ key, ...value }))
           .sort((left, right) => (Number(right.count) || 0) - (Number(left.count) || 0))
@@ -3814,6 +3842,10 @@ export async function apply(ctx, config) {
         }
         const current = pickConfig(readJson(CONFIG_FILE, {}))
         const next = { ...current, ...known }
+        if (Object.prototype.hasOwnProperty.call(known, 'moderationMuteAfter')
+          || Object.prototype.hasOwnProperty.call(known, 'moderationKickAfter')) {
+          assertModerationThresholds(next.moderationMuteAfter, next.moderationKickAfter)
+        }
         if (!writeJson(CONFIG_FILE, next)) {
           sendJson(res, 500, { ok: false, error: `无法写入配置文件：${CONFIG_FILE}` })
           return
