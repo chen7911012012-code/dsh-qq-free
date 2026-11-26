@@ -203,7 +203,10 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
         <label class="row"><input type="checkbox" id="modEnabled" style="flex:0 0 auto"> <span>启用违禁词检测</span></label>
         <label>违禁词（每行一个）<textarea id="modWords"></textarea></label>
         <label>生效群 group_openid（每行一个）<textarea id="modGroups"></textarea></label>
-        <label>第 2 次禁言分钟<input id="modMute" type="number" min="1" max="43200"></label>
+        <label>违规几次后禁言（0=不禁言）<input id="modMuteAfter" type="number" min="0" max="100"></label>
+        <label>禁言时长（分钟）<input id="modMute" type="number" min="1" max="43200"></label>
+        <label>违规几次后踢出（0=不踢）<input id="modKickAfter" type="number" min="0" max="100"></label>
+        <div class="muted">踢出次数必须大于禁言次数；这两个次数只能在 DSH 面板和主网页设置，分群网页只显示。</div>
         <button id="modSave">保存违禁词设置</button>
         <div class="notice hidden" id="modNotice"></div>
         <div class="muted">违规次数</div>
@@ -412,6 +415,8 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
       $('modWords').value = (state.moderation.words || []).join('\n')
       $('modGroups').value = (state.moderation.groups || []).join('\n')
       $('modMute').value = state.moderation.muteMinutes || 10
+      $('modMuteAfter').value = state.moderation.muteAfter ?? 2
+      $('modKickAfter').value = state.moderation.kickAfter ?? 3
       var strikes = $('strikeList'); strikes.innerHTML = ''
       ;(state.moderation.strikes || []).forEach(function (s) {
         var div = document.createElement('div'); div.className = 'item'
@@ -625,7 +630,15 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
       .then(function () { notice($('memberNotice'), '已执行', 'ok') }).catch(function (e) { notice($('memberNotice'), e.message, 'err') })
   }
   $('modSave').onclick = function () {
-    post('/api/moderation', { action: 'save', enabled: $('modEnabled').checked, words: $('modWords').value, groups: $('modGroups').value, muteMinutes: Number($('modMute').value) })
+    post('/api/moderation', {
+      action: 'save',
+      enabled: $('modEnabled').checked,
+      words: $('modWords').value,
+      groups: $('modGroups').value,
+      muteMinutes: Number($('modMute').value),
+      muteAfter: Number($('modMuteAfter').value),
+      kickAfter: Number($('modKickAfter').value),
+    })
       .then(function () { notice($('modNotice'), '已保存', 'ok') }).catch(function (e) { notice($('modNotice'), e.message, 'err') })
   }
   $('strikesReset').onclick = function () {
