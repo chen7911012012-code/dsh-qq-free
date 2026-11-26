@@ -97,6 +97,7 @@ section{display:none}section.on{display:block}
       <div class="grid" id="featureGrid"></div>
       <div class="row" style="margin-top:10px"><button id="blockBtn">保存功能开关</button></div>
       <p class="muted">关闭「入群申请处理」后，本群不再记录/通知入群申请；关闭「入群人机验证」后，本群新成员不验证。</p>
+      <p class="muted" id="modPolicy">违禁词处罚：加载中…</p>
     </div>
     <div class="card">
       <h2>入群欢迎</h2>
@@ -249,6 +250,17 @@ function render() {
   const members = data.members || [];
   $('memberList').innerHTML = members.map((item) => '<li class="item"><div><div>' + esc(item.name || item.openid) + '</div><div class="muted">' + esc(item.openid) + ' · ' + esc(item.role || 'member') + '</div></div><div class="row"><button class="sm" data-mute="' + esc(item.openid) + '">禁言60分</button><button class="sm ghost" data-unmute="' + esc(item.openid) + '">解禁</button><button class="sm danger" data-kick="' + esc(item.openid) + '">踢人</button></div></li>').join('');
   $('memberEmpty').style.display = members.length ? 'none' : 'block';
+  // 违禁词处罚次数：本页只展示，修改入口只在 DSH 面板 / 主网页
+  const policy = data.moderationPolicy || {};
+  const muteAfter = Number(policy.muteAfter) || 0;
+  const kickAfter = Number(policy.kickAfter) || 0;
+  const muteMinutes = Number(policy.muteMinutes) || 10;
+  const parts = [];
+  if (muteAfter > 0) parts.push('违规 ' + muteAfter + ' 次禁言 ' + muteMinutes + ' 分钟');
+  if (kickAfter > 0) parts.push('违规 ' + kickAfter + ' 次移出群聊');
+  $('modPolicy').textContent = parts.length > 0
+    ? '违禁词处罚：' + parts.join('，') + '。（次数由 DSH 面板 / 主网页设置，本页只显示）'
+    : '违禁词处罚：未启用处罚（可在 DSH 面板 / 主网页设置违规几次禁言、几次踢出）。';
   // @ 成员下拉：只列本群已知成员，按 openid 去重，保留当前选择
   const mention = $('mention');
   const keepMention = mention.value;
