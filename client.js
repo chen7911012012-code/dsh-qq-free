@@ -1748,11 +1748,23 @@ window.__ModuleLoader__.load({
             h(Card, {
               title: '分群网页申请',
               wide: true,
-              hint: '分群网页里改「功能开关 / 人机验证 / 沉默清理 / 今日运势」不会直接生效，会先变成申请；在这里或主网页同意后才会写入配置，拒绝则丢弃。',
+              hint: '分群网页「打开功能」需要申请（关闭功能直接生效）；在这里或主网页同意后才会写入配置，拒绝则丢弃。',
             },
               data.groupChangeRequests && data.groupChangeRequests.length > 0
                 ? h('ul', { className: 'qqf-targets' },
                   data.groupChangeRequests.map((entry) => {
+                    const featureNames = {
+                      chat: 'AI 聊天',
+                      auto: '自主发言',
+                      welcome: '入群欢迎',
+                      joinNotice: '入群申请通知',
+                      joinRequest: '入群申请处理',
+                      joinVerify: '入群人机验证',
+                      fortune: '今日运势',
+                      commands: '群管理命令',
+                      moderation: '违禁词',
+                      info: '获取信息',
+                    }
                     const kindLabel = {
                       features: '打开功能',
                       joinVerify: '打开入群人机验证',
@@ -1760,21 +1772,28 @@ window.__ModuleLoader__.load({
                       fortune: '打开今日运势',
                       welcome: '打开入群欢迎',
                       manager: '添加代管',
-                    }[entry.kind] || entry.kind
+                    }[entry.kind] || '未知申请'
+                    const groupTarget = (data.targets || []).find((target) => target.openid === entry.groupOpenid)
+                    const groupName = entry.groupName || groupTarget?.name || '未知群'
+                    const memberName = entry.kind === 'manager'
+                      ? (entry.payload?.name
+                        || (data.members || []).find((member) => member.openid === entry.payload?.memberOpenid)?.name
+                        || '该成员')
+                      : ''
                     const detail = entry.kind === 'features'
-                      ? `打开：${(entry.payload?.unblock || []).join('、') || '无'}`
+                      ? `打开：${(entry.payload?.unblock || []).map((key) => featureNames[key] || key).join('、') || '无'}`
                       : entry.kind === 'welcome'
-                        ? `开启欢迎，文案：${entry.payload?.text || '（空）'}`
+                        ? `开启入群欢迎，文案：${entry.payload?.text || '（空）'}`
                         : entry.kind === 'manager'
-                          ? `代管：${entry.payload?.name || ''} ${entry.payload?.memberOpenid || ''}`.trim()
+                          ? `代管：${memberName}（${String(entry.payload?.memberOpenid || '').slice(-6)}）`
                           : entry.kind === 'cleanup'
-                            ? `开启清理 · ${entry.payload?.time || '03:00'} · ${entry.payload?.days || 30} 天`
+                            ? `开启清理 · ${entry.payload?.time || '03:00'} · 未发言 ${entry.payload?.days || 30} 天`
                             : '开启'
                     return h('li', { key: entry.id, className: 'qqf-target' },
                       h('div', { className: 'qqf-target-main' },
                         h('span', { className: 'qqf-target-name' },
-                          `${entry.groupName || entry.groupOpenid} · ${kindLabel} · ${new Date(entry.requestedAt).toLocaleString('zh-CN', { hour12: false })}`),
-                        h('span', { className: 'qqf-mono' }, detail)),
+                          `${groupName} · ${kindLabel} · ${new Date(entry.requestedAt).toLocaleString('zh-CN', { hour12: false })}`),
+                        h('span', { className: 'qqf-hint' }, detail)),
                       h('div', { className: 'qqf-row' },
                         h('button', {
                           className: 'qqf-btn qqf-btn--sm', disabled: busy !== '',
