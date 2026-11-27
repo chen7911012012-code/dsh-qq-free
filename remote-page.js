@@ -486,14 +486,16 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
 
     var requestList = $('groupRequestsList'); requestList.innerHTML = ''
     ;(state.groupChangeRequests || []).forEach(function (req) {
-      var kindLabel = { features: '功能开关', joinVerify: '入群人机验证', cleanup: '沉默清理', fortune: '今日运势' }[req.kind] || req.kind
+      var kindLabel = { features: '打开功能', joinVerify: '打开入群人机验证', cleanup: '打开沉默清理', fortune: '打开今日运势', welcome: '打开入群欢迎', manager: '添加代管' }[req.kind] || req.kind
       var detail = req.kind === 'features'
-        ? '屏蔽：' + ((req.payload && req.payload.features || []).join('、') || '无') + (req.payload && req.payload.all ? '（全部屏蔽）' : '')
-        : req.kind === 'joinVerify'
-          ? '人机验证：' + (req.payload && req.payload.enabled ? '开启' : '关闭')
-          : req.kind === 'cleanup'
-            ? '清理：' + (req.payload && req.payload.enabled ? '开启' : '关闭') + ' · ' + ((req.payload && req.payload.time) || '03:00') + ' · ' + ((req.payload && req.payload.days) || 30) + ' 天'
-            : '运势：' + (req.payload && req.payload.enabled ? '开启' : '关闭')
+        ? '打开：' + ((req.payload && req.payload.unblock || []).join('、') || '无')
+        : req.kind === 'welcome'
+          ? '开启欢迎，文案：' + ((req.payload && req.payload.text) || '（空）')
+          : req.kind === 'manager'
+            ? '代管：' + ((req.payload && req.payload.name) || '') + ' ' + ((req.payload && req.payload.memberOpenid) || '')
+            : req.kind === 'cleanup'
+              ? '开启清理 · ' + ((req.payload && req.payload.time) || '03:00') + ' · ' + ((req.payload && req.payload.days) || 30) + ' 天'
+              : '开启'
       var div = document.createElement('div'); div.className = 'item'
       var main = document.createElement('div'); main.className = 'item-main'
       var q = document.createElement('div'); q.className = 'q'
