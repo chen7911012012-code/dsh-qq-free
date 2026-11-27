@@ -50,3 +50,6 @@ for (const [label, seed] of [['full', snapshot], ['empty', {}]]) {
     console.log(label + ': THREW ' + error.message)
   }
 }
+index = 0; seeds = [snapshot]
+const t = panel.component({})
+console.log('type=', typeof t.type === 'function' ? (t.type.name || 'fn') : t.type, 'props=', JSON.stringify(t.props).slice(0, 120), 'children=', JSON.stringify(t.children).slice(0, 120))
