@@ -215,6 +215,7 @@ export function createRemoteServer({ getConfig, sendTargets, composeLine, sendMe
           fortune: state.fortune,
           fortunes: state.fortunes,
           pageAnnouncements: state.pageAnnouncements,
+          groupChangeRequests: state.groupChangeRequests,
           log: state.log,
         })
         return
