@@ -109,11 +109,13 @@ section{display:none}section.on{display:block}
     </div>
     <div class="card">
       <h2>入群人机验证</h2>
+      <p class="muted">改动会提交申请，管理员在 DSH 面板 / 主网页同意后才生效。</p>
       <label class="check"><input type="checkbox" id="verifyOn"> 在本群启用图片验证码验证</label>
-      <div class="row" style="margin-top:8px"><button id="verifyBtn">保存验证开关</button><button class="ghost" id="cancelVerifyBtn">取消本次验证</button></div>
+      <div class="row" style="margin-top:8px"><button id="verifyBtn">申请开启/关闭</button><button class="ghost" id="cancelVerifyBtn">取消本次验证</button></div>
     </div>
     <div class="card">
       <h2>沉默低等级成员清理</h2>
+      <p class="muted">改动会提交申请，管理员同意后才生效。</p>
       <label class="check"><input type="checkbox" id="cleanupOn"> 在本群启用</label>
       <div class="row" style="margin-top:8px">
         <input id="cleanupTime" type="time" style="max-width:150px">
@@ -135,6 +137,7 @@ section{display:none}section.on{display:block}
   <section id="tab-fortune">
     <div class="card">
       <h2>今日运势</h2>
+      <p class="muted">改动会提交申请，管理员同意后才生效。</p>
       <label class="check"><input type="checkbox" id="fortuneOn"> 在本群启用今日运势</label>
       <div class="row" style="margin-top:8px"><button id="fortuneSave">保存运势开关</button></div>
       <p class="muted">成员直接发送「今日运势」（无需 @机器人），每天一次，随机运势 + 二次元图片，0 点刷新。</p>
@@ -265,6 +268,11 @@ function render() {
   $('modPolicy').textContent = parts.length > 0
     ? '违禁词处罚：' + parts.join('，') + '。（次数由 DSH 面板 / 主网页设置，本页只显示）'
     : '违禁词处罚：未启用处罚（可在 DSH 面板 / 主网页设置违规几次禁言、几次踢出）。';
+  const pending = data.pendingRequests || [];
+  const KIND_LABELS = { features: '功能开关', joinVerify: '人机验证', cleanup: '沉默清理', fortune: '今日运势' };
+  $('pendingRequests').textContent = pending.length > 0
+    ? '分群网页改动申请：' + pending.map((item) => KIND_LABELS[item.kind] || item.kind).join('、') + '（等待管理员在 DSH 面板 / 主网页同意）'
+    : '分群网页改动申请：无';
   // @ 成员下拉：只列本群已知成员，按 openid 去重，保留当前选择
   const mention = $('mention');
   const keepMention = mention.value;
