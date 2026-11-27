@@ -1754,18 +1754,22 @@ window.__ModuleLoader__.load({
                 ? h('ul', { className: 'qqf-targets' },
                   data.groupChangeRequests.map((entry) => {
                     const kindLabel = {
-                      features: '功能开关',
-                      joinVerify: '入群人机验证',
-                      cleanup: '沉默清理',
-                      fortune: '今日运势',
+                      features: '打开功能',
+                      joinVerify: '打开入群人机验证',
+                      cleanup: '打开沉默清理',
+                      fortune: '打开今日运势',
+                      welcome: '打开入群欢迎',
+                      manager: '添加代管',
                     }[entry.kind] || entry.kind
                     const detail = entry.kind === 'features'
-                      ? `屏蔽：${(entry.payload?.features || []).join('、') || '无'}${entry.payload?.all ? '（全部屏蔽）' : ''}`
-                      : entry.kind === 'joinVerify'
-                        ? `人机验证：${entry.payload?.enabled ? '开启' : '关闭'}`
-                        : entry.kind === 'cleanup'
-                          ? `清理：${entry.payload?.enabled ? '开启' : '关闭'} · ${entry.payload?.time || '03:00'} · ${entry.payload?.days || 30} 天`
-                          : `运势：${entry.payload?.enabled ? '开启' : '关闭'}`
+                      ? `打开：${(entry.payload?.unblock || []).join('、') || '无'}`
+                      : entry.kind === 'welcome'
+                        ? `开启欢迎，文案：${entry.payload?.text || '（空）'}`
+                        : entry.kind === 'manager'
+                          ? `代管：${entry.payload?.name || ''} ${entry.payload?.memberOpenid || ''}`.trim()
+                          : entry.kind === 'cleanup'
+                            ? `开启清理 · ${entry.payload?.time || '03:00'} · ${entry.payload?.days || 30} 天`
+                            : '开启'
                     return h('li', { key: entry.id, className: 'qqf-target' },
                       h('div', { className: 'qqf-target-main' },
                         h('span', { className: 'qqf-target-name' },
