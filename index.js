@@ -2891,6 +2891,21 @@ export async function apply(ctx, config) {
       })
       return { saved: true }
     },
+    groupWelcome(body) {
+      const action = String(body.action ?? 'save')
+      if (action === 'save') {
+        const groupOpenid = assertGroupOpenid(body.groupOpenid)
+        return { welcome: saveGroupWelcome({ groupOpenid, enabled: body.enabled === true, text: body.text }) }
+      }
+      return { list: state.groupWelcomes }
+    },
+    groupRequests(body) {
+      const action = String(body.action ?? 'list')
+      if (action === 'approve' || action === 'reject') {
+        return resolveGroupRequest({ id: body.id, approve: action === 'approve' })
+      }
+      return { list: state.groupChangeRequests }
+    },
     welcome(body) {
       saveConfigPatch({
         welcomeEnabled: body.enabled === true,
@@ -3056,9 +3071,9 @@ export async function apply(ctx, config) {
         .filter((item) => item.active !== false
           && (!Array.isArray(item.groups) || item.groups.length === 0 || item.groups.includes(groupOpenid)))
         .slice(-5),
+      pendingRequests: state.groupChangeRequests.filter((item) => item.groupOpenid === groupOpenid),
       welcome: {
-        enabled: liveConfig.welcomeEnabled === true && (welcomeGroups.length === 0 || welcomeGroups.includes(groupOpenid)),
-        text: liveConfig.welcomeText || '',
+        ...getGroupWelcome(groupOpenid),
         joinNotice: liveConfig.joinNoticeEnabled !== false,
       },
       joinVerify: {
@@ -3148,20 +3163,12 @@ export async function apply(ctx, config) {
       return { ok: true }
     }
     if (action === 'save-blocks') {
-      const features = Array.isArray(body.features) ? body.features : []
-      return handleGroupBlocks({ action: 'save', groupOpenid, all: body.all === true, features })
+      const features = (Array.isArray(body.features) ? body.features : []).map((item) => String(item)).filter((item) => GROUP_FEATURES.includes(item))
+      return { request: createGroupRequest({ groupOpenid, kind: 'features', payload: { all: body.all === true, features: [...new Set(features)] } }) }
     }
     if (action === 'welcome-save') {
-      const current = Array.isArray(liveConfig.welcomeGroups) ? liveConfig.welcomeGroups : []
-      const groups = body.enabled === true
-        ? [...new Set([...current.filter((item) => item !== groupOpenid), groupOpenid])]
-        : current.filter((item) => item !== groupOpenid)
-      saveConfigPatch({
-        welcomeEnabled: body.enabled === true,
-        welcomeText: String(body.text ?? '').slice(0, 2000),
-        welcomeGroups: groups,
-      })
-      return { ok: true }
+      // 入群欢迎是每个群独立的，分群网页可以直接改自己群的欢迎设置
+      return { welcome: saveGroupWelcome({ groupOpenid, enabled: body.enabled === true, text: body.text }) }
     }
     if (action === 'join-verify-cancel') {
       let count = 0
@@ -3171,15 +3178,8 @@ export async function apply(ctx, config) {
       }
       return { cancelled: count }
     }
-    if (action === 'join-verify-save') {      const current = Array.isArray(liveConfig.joinVerifyGroups) ? liveConfig.joinVerifyGroups : []
-      const groups = body.enabled === true
-        ? [...new Set([...current, groupOpenid])]
-        : current.filter((item) => item !== groupOpenid)
-      saveConfigPatch({
-        joinVerifyEnabled: groups.length > 0,
-        joinVerifyGroups: groups,
-      })
-      return { ok: true }
+    if (action === 'join-verify-save') {
+      return { request: createGroupRequest({ groupOpenid, kind: 'joinVerify', payload: { enabled: body.enabled === true } }) }
     }
     if (action === 'manager-add' || action === 'manager-remove') {
       const memberOpenid = assertMemberOpenid(body.memberOpenid)
@@ -3229,31 +3229,21 @@ export async function apply(ctx, config) {
       return runAnnouncements(String(body.id ?? ''))
     }
     if (action === 'fortune-save') {
-      const configured = Array.isArray(liveConfig.fortuneGroups) ? liveConfig.fortuneGroups : []
-      const allGroups = state.targets.filter((item) => item.scope === 'group').map((item) => item.openid)
-      const current = configured.length > 0 ? configured : allGroups
-      const groups = body.enabled === true
-        ? [...new Set([...current, groupOpenid])]
-        : current.filter((item) => item !== groupOpenid)
-      saveConfigPatch({
-        fortuneEnabled: body.enabled === true || groups.length > 0,
-        fortuneGroups: groups,
-      })
-      return { ok: true }
+      return { request: createGroupRequest({ groupOpenid, kind: 'fortune', payload: { enabled: body.enabled === true } }) }
     }
     if (action === 'cleanup-save') {
-      const current = Array.isArray(liveConfig.inactiveCleanupGroups) ? liveConfig.inactiveCleanupGroups : []
-      const groups = body.enabled === true
-        ? [...new Set([...current, groupOpenid])]
-        : current.filter((item) => item !== groupOpenid)
-      saveConfigPatch({
-        inactiveCleanupEnabled: groups.length > 0,
-        inactiveCleanupGroups: groups,
-        inactiveCleanupTime: String(body.time ?? '03:00').slice(0, 5),
-        inactiveCleanupDays: Number(body.days) || 30,
-        inactiveCleanupMaxLevel: Number(body.maxLevel) || 1,
-      })
-      return { ok: true }
+      return {
+        request: createGroupRequest({
+          groupOpenid,
+          kind: 'cleanup',
+          payload: {
+            enabled: body.enabled === true,
+            time: String(body.time ?? '03:00').slice(0, 5),
+            days: Math.max(1, Math.min(3650, Number(body.days) || 30)),
+            maxLevel: Math.max(0, Math.min(100, Number(body.maxLevel) || 1)),
+          },
+        }),
+      }
     }
     if (action === 'group-info') {
       return { text: await groupInfoReply(groupOpenid) }
@@ -3790,6 +3780,11 @@ export async function apply(ctx, config) {
         enabled: Boolean(liveConfig.welcomeEnabled),
         text: liveConfig.welcomeText || '',
         groups: Array.isArray(liveConfig.welcomeGroups) ? liveConfig.welcomeGroups : [],
+        perGroup: Object.fromEntries(Object.entries(state.groupWelcomes).map(([openid, entry]) => [openid, {
+          enabled: entry.enabled === true,
+          text: String(entry.text ?? ''),
+          updatedAt: entry.updatedAt || '',
+        }])),
         joinNoticeEnabled: Boolean(liveConfig.joinNoticeEnabled),
         joinNoticeAvatar: liveConfig.joinNoticeAvatar !== false,
       },
@@ -3800,6 +3795,7 @@ export async function apply(ctx, config) {
       featureBlocks: state.featureBlocks.slice(-500),
       announcements: state.announcements.slice(-50),
       pageAnnouncements: state.pageAnnouncements.slice(-50),
+      groupChangeRequests: state.groupChangeRequests.slice(-50),
       groupManagers: state.groupManagers.slice(-200),
       groupPages: state.groupPages.map((item) => ({
         ...item,
@@ -4430,6 +4426,39 @@ export async function apply(ctx, config) {
           return
         }
         sendJson(res, 200, { ok: true, result: githubSync.status(), state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/qq-free/welcome-group',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const action = String(body.action ?? 'save')
+        if (action === 'save') {
+          const groupOpenid = assertGroupOpenid(body.groupOpenid)
+          const welcome = saveGroupWelcome({ groupOpenid, enabled: body.enabled === true, text: body.text })
+          sendJson(res, 200, { ok: true, welcome, state: snapshot() })
+          return
+        }
+        sendJson(res, 200, { ok: true, list: state.groupWelcomes, state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
+      path: '/qq-free/group-requests',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const action = String(body.action ?? 'list')
+        if (action === 'approve' || action === 'reject') {
+          const result = resolveGroupRequest({ id: body.id, approve: action === 'approve' })
+          sendJson(res, 200, { ok: true, ...result, state: snapshot() })
+          return
+        }
+        sendJson(res, 200, { ok: true, list: state.groupChangeRequests, state: snapshot() })
       }),
     }))
 
