@@ -703,9 +703,10 @@ if (ws) {
   await sleep(200)
   check('禁言结束未发言时不发验证码', !sent.slice(beforeMuted).some((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && JSON.stringify(item.body).includes('5 分钟')))
   ws.emit({ op: 0, s: 30, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-DEFER', content: '在吗', group_openid: GROUP, mentions: [], author: { member_openid: 'DEFER001', member_nickname: '禁言新人', member_role: 'member' } } })
-  await sleep(150)
+  await sleep(200)
+  const deferredRecall = sent.slice(beforeMuted).some((item) => item.method === 'DELETE' && item.target.includes('/messages/EV-DEFER'))
   const deferredChallenge = sent.slice(beforeMuted).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && JSON.stringify(item.body).includes('5 分钟') && JSON.stringify(item.body).includes('DEFER001'))
-  check('禁言结束发言后五分钟验证', Boolean(deferredChallenge))
+  check('禁言结束后第一条消息立即撤回并 @ 对方验证', Boolean(deferredRecall) && Boolean(deferredChallenge))
   await call('/qq-free/join-verify/cancel', 'POST', {})
   groupMuted = false
 
@@ -727,11 +728,20 @@ if (ws) {
   await sleep(200)
   const verifyCode2 = readVerifyCode('VERIFY02')
   const wrongCode = verifyCode2 === '000000' ? '111111' : '000000'
-  ws.emit({ op: 0, s: 33, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-VERIFY-BAD', content: `<@BOT> ${wrongCode}`, group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'VERIFY02', member_role: 'member' } } })
+  // 第 1 次：发无关消息 → 撤回 + 记一次失败，不踢
+  ws.emit({ op: 0, s: 33, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-VERIFY-CHAT', content: '大家好', group_openid: GROUP, mentions: [], author: { member_openid: 'VERIFY02', member_role: 'member' } } })
   await sleep(200)
+  const chatRecall = sent.slice(beforeWrong).some((item) => item.method === 'DELETE' && item.target.includes('/messages/EV-VERIFY-CHAT'))
+  const chatWarnReply = sent.slice(beforeWrong).find((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-VERIFY-CHAT')
+  const noKickYet = !sent.slice(beforeWrong).some((item) => item.target.includes('/batch_remove_members') && JSON.stringify(item.body).includes('VERIFY02'))
+  check('未验证成员发无关消息立即撤回并警告', chatRecall && Boolean(chatWarnReply) && chatWarnReply.body.content.includes('已撤回消息') && noKickYet)
+  // 第 2 次：验证码错误 → 撤回后踢出
+  ws.emit({ op: 0, s: 34, t: 'GROUP_MESSAGE_CREATE', d: { id: 'EV-VERIFY-BAD', content: `<@BOT> ${wrongCode}`, group_openid: GROUP, mentions: [{ bot: true, is_you: true }], author: { member_openid: 'VERIFY02', member_role: 'member' } } })
+  await sleep(200)
+  const badRecall = sent.slice(beforeWrong).some((item) => item.method === 'DELETE' && item.target.includes('/messages/EV-VERIFY-BAD'))
   const wrongReplyIndex = sent.findIndex((item) => item.target.endsWith(`/v2/groups/${GROUP}/messages`) && item.body?.msg_id === 'EV-VERIFY-BAD')
   const wrongKickIndex = sent.findIndex((item) => item.target.includes('/batch_remove_members') && JSON.stringify(item.body).includes('VERIFY02'))
-  check('验证码错误先回复再踢人', wrongReplyIndex >= 0 && wrongKickIndex > wrongReplyIndex && sent[wrongReplyIndex]?.body?.content?.includes('验证码错误，已将 新人二 移出群聊'))
+  check('验证失败两次后撤回并踢出', badRecall && wrongReplyIndex >= 0 && wrongKickIndex > wrongReplyIndex && sent[wrongReplyIndex]?.body?.content?.includes('验证失败 2 次'))
 
   const beforeCancel = sent.length
   ws.emit({ op: 0, s: 34, t: 'GROUP_MEMBER_ADD', d: { group_openid: GROUP, member_openid: 'VERIFY03', username: '新人三', member_role: 'member', timestamp: new Date().toISOString() } })
