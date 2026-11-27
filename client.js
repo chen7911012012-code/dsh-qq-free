@@ -391,6 +391,17 @@ window.__ModuleLoader__.load({
             joinAvatar: data.welcome.joinNoticeAvatar !== false,
           })
         }
+        if (wgForms === null && data.welcome) {
+          const rows = {}
+          for (const target of (data.targets || []).filter((item) => item.scope === 'group')) {
+            const per = data.welcome.perGroup?.[target.openid]
+            rows[target.openid] = {
+              enabled: per ? per.enabled === true : data.welcome.enabled === true,
+              text: per ? String(per.text || '') : String(data.welcome.text || ''),
+            }
+          }
+          setWgForms(rows)
+        }
         if (adminGroup === '') {
           const firstGroup = (data.targets || []).find((target) => target.scope === 'group')
           if (firstGroup) setAdminGroup(firstGroup.openid)
@@ -1019,8 +1030,26 @@ window.__ModuleLoader__.load({
         }
       }
 
-      async function saveWelcome() {
-        if (welcomeForm === null) return
+      async function saveGroupWelcome(target) {
+        const row = wgForms?.[target.openid] ?? { enabled: false, text: '' }
+        const result = await run(`group-welcome-${target.openid}`, () => request('/qq-free/welcome-group', {
+          action: 'save',
+          groupOpenid: target.openid,
+          enabled: row.enabled === true,
+          text: row.text ?? '',
+        }))
+        if (result !== null) flash('ok', `已保存「${target.name}」的欢迎设置。`)
+      }
+
+      async function decideGroupRequest(entry, approve) {
+        const result = await run(`group-request-${entry.id}`, () => request('/qq-free/group-requests', {
+          action: approve ? 'approve' : 'reject',
+          id: entry.id,
+        }))
+        if (result !== null) flash('ok', approve ? '已同意申请，设置已生效。' : '已拒绝申请。')
+      }
+
+      async function saveWelcome() {        if (welcomeForm === null) return
         const result = await run('welcome', () => request('/qq-free/config', {
           welcomeEnabled: welcomeForm.enabled,
           welcomeText: welcomeForm.text,
@@ -1712,6 +1741,44 @@ window.__ModuleLoader__.load({
                   onClick: () => void memberAction('kick'),
                 }, kickArmed ? '确认踢出' : '踢出'),
                 kickArmed ? h('button', { className: 'qqf-btn qqf-btn--sm', onClick: () => setKickArmed(false) }, '取消') : null)),
+
+            h(Card, {
+              title: '分群网页申请',
+              wide: true,
+              hint: '分群网页里改「功能开关 / 人机验证 / 沉默清理 / 今日运势」不会直接生效，会先变成申请；在这里或主网页同意后才会写入配置，拒绝则丢弃。',
+            },
+              data.groupChangeRequests && data.groupChangeRequests.length > 0
+                ? h('ul', { className: 'qqf-targets' },
+                  data.groupChangeRequests.map((entry) => {
+                    const kindLabel = {
+                      features: '功能开关',
+                      joinVerify: '入群人机验证',
+                      cleanup: '沉默清理',
+                      fortune: '今日运势',
+                    }[entry.kind] || entry.kind
+                    const detail = entry.kind === 'features'
+                      ? `屏蔽：${(entry.payload?.features || []).join('、') || '无'}${entry.payload?.all ? '（全部屏蔽）' : ''}`
+                      : entry.kind === 'joinVerify'
+                        ? `人机验证：${entry.payload?.enabled ? '开启' : '关闭'}`
+                        : entry.kind === 'cleanup'
+                          ? `清理：${entry.payload?.enabled ? '开启' : '关闭'} · ${entry.payload?.time || '03:00'} · ${entry.payload?.days || 30} 天`
+                          : `运势：${entry.payload?.enabled ? '开启' : '关闭'}`
+                    return h('li', { key: entry.id, className: 'qqf-target' },
+                      h('div', { className: 'qqf-target-main' },
+                        h('span', { className: 'qqf-target-name' },
+                          `${entry.groupName || entry.groupOpenid} · ${kindLabel} · ${new Date(entry.requestedAt).toLocaleString('zh-CN', { hour12: false })}`),
+                        h('span', { className: 'qqf-mono' }, detail)),
+                      h('div', { className: 'qqf-row' },
+                        h('button', {
+                          className: 'qqf-btn qqf-btn--sm', disabled: busy !== '',
+                          onClick: () => void decideGroupRequest(entry, true),
+                        }, '同意'),
+                        h('button', {
+                          className: 'qqf-btn qqf-btn--sm qqf-btn--danger', disabled: busy !== '',
+                          onClick: () => void decideGroupRequest(entry, false),
+                        }, '拒绝')))
+                  }))
+                : h('p', { className: 'qqf-empty' }, '没有待处理的申请。')),
 
             h(Card, {
               title: 'GitHub 更新',
