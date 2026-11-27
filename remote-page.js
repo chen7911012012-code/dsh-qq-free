@@ -233,8 +233,17 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
         <label>欢迎生效群（每行一个，留空全部）<textarea id="welcomeGroups"></textarea></label>
         <label class="row"><input type="checkbox" id="joinNoticeEnabled" style="flex:0 0 auto"> <span>发送入群申请通知</span></label>
         <label class="row"><input type="checkbox" id="joinNoticeAvatar" style="flex:0 0 auto"> <span>通知带申请头像</span></label>
-        <button id="welcomeSave">保存欢迎设置</button>
+        <button id="welcomeSave">保存全局默认</button>
         <div class="notice hidden" id="welcomeNotice"></div>
+        <div class="muted" style="margin-top:8px">每个群单独设置（分群网页也能改自己群的；不单独设置的群沿用上面的全局默认）</div>
+        <div class="list" id="welcomeGroupsList"></div>
+      </div>
+
+      <div class="card">
+        <strong style="font-size:14px">分群网页申请</strong>
+        <div class="muted">分群网页改「功能开关 / 人机验证 / 沉默清理 / 今日运势」会先提交申请，这里同意后才生效。</div>
+        <div class="list" id="groupRequestsList"></div>
+        <div class="notice hidden" id="requestNotice"></div>
       </div>
 
       <div class="card">
@@ -289,6 +298,7 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
   var mediaFile = null
   var boardPick = []
   var paPick = []
+  var wgEdit = {}
   var $ = function (id) { return document.getElementById(id) }
   function headers() { return { 'authorization': 'Bearer ' + token, 'content-type': 'application/json' } }
   function notice(el, text, kind) { el.className = 'notice' + (kind ? ' ' + kind : ''); el.textContent = text; el.classList.remove('hidden') }
@@ -441,6 +451,65 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
       $('welcomeGroups').value = (state.welcome.groups || []).join('\n')
       $('joinNoticeEnabled').checked = state.welcome.joinNoticeEnabled === true
       $('joinNoticeAvatar').checked = state.welcome.joinNoticeAvatar === true
+
+      var welcomeList = $('welcomeGroupsList'); welcomeList.innerHTML = ''
+      ;(state.targets || []).filter(function (t) { return t.scope === 'group' }).forEach(function (t) {
+        var per = state.welcome.perGroup && state.welcome.perGroup[t.openid]
+        var draft = wgEdit[t.openid] || {
+          enabled: per ? per.enabled === true : state.welcome.enabled === true,
+          text: per ? String(per.text || '') : String(state.welcome.text || ''),
+        }
+        wgEdit[t.openid] = draft
+        var div = document.createElement('div'); div.className = 'item'
+        var main = document.createElement('div'); main.className = 'item-main'
+        var q = document.createElement('div'); q.className = 'q'; q.textContent = t.name + (per ? '' : ' · 未单独设置（沿用全局）')
+        var row = document.createElement('label'); row.className = 'row'
+        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.style.flex = '0 0 auto'; cb.checked = draft.enabled === true
+        cb.onchange = function () { draft.enabled = cb.checked }
+        var span = document.createElement('span'); span.textContent = '启用本群欢迎'
+        row.appendChild(cb); row.appendChild(span)
+        var input = document.createElement('input'); input.value = draft.text
+        input.placeholder = '本群欢迎语'
+        input.oninput = function () { draft.text = input.value }
+        var actions = document.createElement('div'); actions.className = 'item-actions'
+        var save = document.createElement('button'); save.className = 'sm'; save.textContent = '保存本群'
+        save.onclick = function () {
+          post('/api/groupWelcome', { action: 'save', groupOpenid: t.openid, enabled: draft.enabled === true, text: draft.text || '' })
+            .then(function () { notice($('welcomeNotice'), '已保存「' + t.name + '」的欢迎设置', 'ok') })
+            .catch(function (e) { notice($('welcomeNotice'), e.message, 'err') })
+        }
+        actions.appendChild(save)
+        main.appendChild(q); main.appendChild(row); main.appendChild(input)
+        div.appendChild(main); div.appendChild(actions); welcomeList.appendChild(div)
+      })
+    }
+
+    var requestList = $('groupRequestsList'); requestList.innerHTML = ''
+    ;(state.groupChangeRequests || []).forEach(function (req) {
+      var kindLabel = { features: '功能开关', joinVerify: '入群人机验证', cleanup: '沉默清理', fortune: '今日运势' }[req.kind] || req.kind
+      var detail = req.kind === 'features'
+        ? '屏蔽：' + ((req.payload && req.payload.features || []).join('、') || '无') + (req.payload && req.payload.all ? '（全部屏蔽）' : '')
+        : req.kind === 'joinVerify'
+          ? '人机验证：' + (req.payload && req.payload.enabled ? '开启' : '关闭')
+          : req.kind === 'cleanup'
+            ? '清理：' + (req.payload && req.payload.enabled ? '开启' : '关闭') + ' · ' + ((req.payload && req.payload.time) || '03:00') + ' · ' + ((req.payload && req.payload.days) || 30) + ' 天'
+            : '运势：' + (req.payload && req.payload.enabled ? '开启' : '关闭')
+      var div = document.createElement('div'); div.className = 'item'
+      var main = document.createElement('div'); main.className = 'item-main'
+      var q = document.createElement('div'); q.className = 'q'
+      q.textContent = (req.groupName || req.groupOpenid) + ' · ' + kindLabel + ' · ' + new Date(req.requestedAt).toLocaleString('zh-CN', { hour12: false })
+      var meta = document.createElement('div'); meta.className = 'mono'; meta.textContent = detail
+      main.appendChild(q); main.appendChild(meta)
+      var actions = document.createElement('div'); actions.className = 'item-actions'
+      var ok = document.createElement('button'); ok.className = 'sm'; ok.textContent = '同意'
+      ok.onclick = function () { post('/api/groupRequests', { action: 'approve', id: req.id }).then(function () { notice($('requestNotice'), '已同意，设置已生效', 'ok') }).catch(function (e) { notice($('requestNotice'), e.message, 'err') }) }
+      var no = document.createElement('button'); no.className = 'sm danger'; no.textContent = '拒绝'
+      no.onclick = function () { post('/api/groupRequests', { action: 'reject', id: req.id }).then(function () { notice($('requestNotice'), '已拒绝', 'ok') }).catch(function (e) { notice($('requestNotice'), e.message, 'err') }) }
+      actions.appendChild(ok); actions.appendChild(no); div.appendChild(main); div.appendChild(actions); requestList.appendChild(div)
+    })
+    if ((state.groupChangeRequests || []).length === 0) {
+      var empty = document.createElement('div'); empty.className = 'muted'; empty.textContent = '没有待处理的申请'
+      requestList.appendChild(empty)
     }
 
     var targetList = $('targetList'); targetList.innerHTML = ''
