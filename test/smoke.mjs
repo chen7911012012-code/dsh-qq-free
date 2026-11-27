@@ -209,7 +209,7 @@ await module.apply(ctx, {
   quietHoursStart: '23:00',
   quietHoursEnd: '08:00',
 })
-check('注册了 31 条 HTTP 路由', routes.size === 31, [...routes.keys()].join(', '))
+check('注册了 33 条 HTTP 路由', routes.size === 33, [...routes.keys()].join(', '))
 check('注册了 3 个工具', tools.length === 3)
 const qaGuidance = sections.find((section) => section.name === 'qq-free:qa-guidance')
 const qaLibrary = sections.find((section) => section.name === 'qq-free:qa-library')
@@ -923,8 +923,10 @@ check('分群网页可直接改本群欢迎（无需申请）', gpWelcomeEdit.st
 const beforeWelcome = sent.length
 ws.emit({ op: 0, s: 77, t: 'GROUP_MEMBER_ADD', d: { group_openid: GROUP, member_openid: 'WELCOMEMEMBER1' } })
 await sleep(150)
-const welcomeFrame = sent.slice(beforeWelcome).find((item) => item.method === 'POST' && item.target.endsWith(`/v2/groups/${GROUP}/messages`))
-check('入群欢迎用本群文案发送', Boolean(welcomeFrame) && String(welcomeFrame.body?.content ?? '').includes('分群网页改的欢迎'), JSON.stringify(welcomeFrame?.body))
+const welcomeFrame = sent.slice(beforeWelcome).find((item) => item.method === 'POST'
+  && item.target.endsWith(`/v2/groups/${GROUP}/messages`)
+  && String(item.body?.content ?? '').includes('分群网页改的欢迎'))
+check('入群欢迎用本群文案发送', Boolean(welcomeFrame), JSON.stringify(sent.slice(beforeWelcome).map((item) => item.body?.content)))
 await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: true, expiresAt: '2020-01-01T00:00:00.000Z' })
 const gpExpired = await httpCall(`${remoteBase}/g/${encodeURIComponent(groupToken)}`)
 check('分群网页过期', gpExpired.status === 410)
