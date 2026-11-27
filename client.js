@@ -1051,7 +1051,8 @@ window.__ModuleLoader__.load({
         if (result !== null) flash('ok', approve ? '已同意申请，设置已生效。' : '已拒绝申请。')
       }
 
-      async function saveWelcome() {        if (welcomeForm === null) return
+      async function saveWelcome() {
+        if (welcomeForm === null) return
         const result = await run('welcome', () => request('/qq-free/config', {
           welcomeEnabled: welcomeForm.enabled,
           welcomeText: welcomeForm.text,
