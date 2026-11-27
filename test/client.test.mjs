@@ -1,8 +1,11 @@
 /**
  * 客户端模块的注册冒烟测试：用假 window / React / ctx 跑一遍 apply，
- * 确认槽位注册契约（main、sidebar.panellist、plugins.detail.actions、settings.section）没有写错。
+ * 确认槽位注册契约（main、sidebar.panellist、plugins.detail.actions、settings.section）没有写错，
+ * 并用一份脱敏后的真实状态快照把面板完整渲染一遍（能抓到 JSX 里引用未声明变量这类运行期错误）。
  * 运行：node test/client.test.mjs
  */
+
+import { readFileSync } from 'node:fs'
 
 let captured = null
 globalThis.window = {
@@ -11,9 +14,17 @@ globalThis.window = {
   },
 }
 
+let stateIndex = 0
+let stateSeeds = []
 const React = {
   createElement(type, props, ...children) { return { type, props, children } },
-  useState(initial) { return [typeof initial === 'function' ? initial() : initial, () => {}] },
+  useState(initial) {
+    const i = stateIndex
+    stateIndex += 1
+    const seed = stateSeeds[i]
+    const value = seed !== undefined ? seed : (typeof initial === 'function' ? initial() : initial)
+    return [value, () => {}]
+  },
   useEffect() {},
   useRef(value) { return { current: value } },
   useCallback(fn) { return fn },
@@ -74,6 +85,28 @@ for (const entry of registered.filter((item) => ['main', 'settings.section'].inc
   } catch (error) {
     check(`${entry.slot} 组件可渲染出元素`, false, error.message)
   }
+}
+
+// 用真实快照把面板完整渲染一遍：React 组件里引用未声明的变量只会在渲染时炸，
+// 单元测试里 data 为 null 会提前 return，所以必须喂一份真实结构的数据。
+const snapshot = JSON.parse(readFileSync(new URL('./snapshot.fixture.json', import.meta.url), 'utf8'))
+const main = registered.find((entry) => entry.slot === 'main')
+try {
+  const wrapper = main.component({})
+  const Inner = wrapper.type
+  stateIndex = 0
+  stateSeeds = [snapshot]
+  const tree = Inner({})
+  let nodes = 0
+  const walk = (node) => {
+    if (node === null || node === undefined) return
+    if (Array.isArray(node)) { for (const item of node) walk(item); return }
+    if (typeof node === 'object' && node.type) { nodes += 1; walk(node.children) }
+  }
+  walk(tree)
+  check('面板能用真实快照完整渲染', nodes > 100, `nodes=${nodes}`)
+} catch (error) {
+  check('面板能用真实快照完整渲染', false, error.message)
 }
 
 console.log(failures === 0 ? '\n全部通过' : `\n${failures} 项失败`)
