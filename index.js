@@ -3163,12 +3163,50 @@ export async function apply(ctx, config) {
       return { ok: true }
     }
     if (action === 'save-blocks') {
-      const features = (Array.isArray(body.features) ? body.features : []).map((item) => String(item)).filter((item) => GROUP_FEATURES.includes(item))
-      return { request: createGroupRequest({ groupOpenid, kind: 'features', payload: { all: body.all === true, features: [...new Set(features)] } }) }
+      const features = [...new Set((Array.isArray(body.features) ? body.features : [])
+        .map((item) => String(item))
+        .filter((item) => GROUP_FEATURES.includes(item)))]
+      const requestedAll = body.all === true
+      const block = getGroupBlock(groupOpenid) ?? { all: false, features: [] }
+      const currentAll = block.all === true
+      const currentBlocked = new Set(Array.isArray(block.features) ? block.features : [])
+      // 关闭功能（新增屏蔽 / 打开全部屏蔽）立即生效；打开功能才需要申请
+      if (requestedAll && !currentAll) {
+        handleGroupBlocks({ action: 'save', groupOpenid, all: true, features })
+        return { ok: true, applied: true }
+      }
+      const newlyBlocked = features.filter((item) => !currentBlocked.has(item))
+      const newlyUnblocked = [...currentBlocked].filter((item) => !features.includes(item))
+      if (newlyBlocked.length > 0 || currentAll) {
+        handleGroupBlocks({
+          action: 'save',
+          groupOpenid,
+          all: false,
+          features: [...new Set([...currentBlocked, ...newlyBlocked])],
+        })
+      }
+      if (newlyUnblocked.length > 0) {
+        return {
+          applied: newlyBlocked.length > 0,
+          request: createGroupRequest({ groupOpenid, kind: 'features', payload: { unblock: newlyUnblocked } }),
+        }
+      }
+      return { ok: true, applied: true }
     }
     if (action === 'welcome-save') {
-      // 入群欢迎是每个群独立的，分群网页可以直接改自己群的欢迎设置
-      return { welcome: saveGroupWelcome({ groupOpenid, enabled: body.enabled === true, text: body.text }) }
+      // 入群欢迎每个群独立：关闭、或本来就开着时改文案，直接生效；从关注销到打开才算「打开功能」，要申请
+      const current = getGroupWelcome(groupOpenid)
+      const wantsEnable = body.enabled === true
+      if (wantsEnable && current.enabled !== true) {
+        return {
+          request: createGroupRequest({
+            groupOpenid,
+            kind: 'welcome',
+            payload: { enabled: true, text: String(body.text ?? '').slice(0, 1000) },
+          }),
+        }
+      }
+      return { welcome: saveGroupWelcome({ groupOpenid, enabled: wantsEnable, text: body.text }) }
     }
     if (action === 'join-verify-cancel') {
       let count = 0
@@ -3179,20 +3217,20 @@ export async function apply(ctx, config) {
       return { cancelled: count }
     }
     if (action === 'join-verify-save') {
-      return { request: createGroupRequest({ groupOpenid, kind: 'joinVerify', payload: { enabled: body.enabled === true } }) }
+      return requestOrApplyToggle(groupOpenid, 'joinVerify', body.enabled === true)
     }
     if (action === 'manager-add' || action === 'manager-remove') {
       const memberOpenid = assertMemberOpenid(body.memberOpenid)
       if (action === 'manager-add') {
+        // 添加代管＝授予权限（打开功能），需要申请；移除直接生效
         if (!isGroupDelegate(groupOpenid, memberOpenid)) {
-          state.groupManagers.push({
-            groupOpenid,
-            memberOpenid,
-            name: String(body.name ?? '').slice(0, 60),
-            addedBy: '分群网页',
-            addedAt: new Date().toISOString(),
-          })
-          persistState()
+          return {
+            request: createGroupRequest({
+              groupOpenid,
+              kind: 'manager',
+              payload: { memberOpenid, name: String(body.name ?? '').slice(0, 60) },
+            }),
+          }
         }
       } else {
         state.groupManagers = state.groupManagers.filter((item) => !(item.groupOpenid === groupOpenid && item.memberOpenid === memberOpenid))
