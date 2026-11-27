@@ -91,11 +91,13 @@ section{display:none}section.on{display:block}
       <label class="check"><input type="checkbox" id="aiChatOn"> AI 聊天（@机器人问答 / 闲聊）</label>
       <label class="check" style="margin-top:8px"><input type="checkbox" id="autoOn"> 自主发言（主动插话）</label>
       <div class="row" style="margin-top:10px"><button id="aiChatSave">保存聊天开关</button></div>
+      <p class="muted">打开（取消屏蔽）需要申请；关闭立即生效。</p>
     </div>
     <div class="card">
       <h2>其他群功能开关</h2>
       <div class="grid" id="featureGrid"></div>
       <div class="row" style="margin-top:10px"><button id="blockBtn">保存功能开关</button></div>
+      <p class="muted">打开功能需要申请（管理员同意后生效）；关闭功能立即生效。</p>
       <p class="muted">关闭「入群申请处理」后，本群不再记录/通知入群申请；关闭「入群人机验证」后，本群新成员不验证。</p>
       <p class="muted" id="modPolicy">违禁词处罚：加载中…</p>
       <p class="muted" id="pendingRequests">分群网页改动申请：无</p>
@@ -109,13 +111,13 @@ section{display:none}section.on{display:block}
     </div>
     <div class="card">
       <h2>入群人机验证</h2>
-      <p class="muted">改动会提交申请，管理员在 DSH 面板 / 主网页同意后才生效。</p>
+      <p class="muted">打开功能需要提交申请，管理员在 DSH 面板 / 主网页同意后生效；关闭功能立即生效。</p>
       <label class="check"><input type="checkbox" id="verifyOn"> 在本群启用图片验证码验证</label>
       <div class="row" style="margin-top:8px"><button id="verifyBtn">申请开启/关闭</button><button class="ghost" id="cancelVerifyBtn">取消本次验证</button></div>
     </div>
     <div class="card">
       <h2>沉默低等级成员清理</h2>
-      <p class="muted">改动会提交申请，管理员同意后才生效。</p>
+      <p class="muted">打开需要提交申请，管理员同意后生效；关闭立即生效。</p>
       <label class="check"><input type="checkbox" id="cleanupOn"> 在本群启用</label>
       <div class="row" style="margin-top:8px">
         <input id="cleanupTime" type="time" style="max-width:150px">
@@ -137,7 +139,7 @@ section{display:none}section.on{display:block}
   <section id="tab-fortune">
     <div class="card">
       <h2>今日运势</h2>
-      <p class="muted">改动会提交申请，管理员同意后才生效。</p>
+      <p class="muted">打开需要提交申请，管理员同意后生效；关闭立即生效。</p>
       <label class="check"><input type="checkbox" id="fortuneOn"> 在本群启用今日运势</label>
       <div class="row" style="margin-top:8px"><button id="fortuneSave">保存运势开关</button></div>
       <p class="muted">成员直接发送「今日运势」（无需 @机器人），每天一次，随机运势 + 二次元图片，0 点刷新。</p>
@@ -185,7 +187,8 @@ async function act(action, body) {
   try {
     const result = await api('/gapi/action?token=' + encodeURIComponent(TOKEN), { method: 'POST', body: JSON.stringify({ action, ...(body || {}) }) });
     void load();
-    if (result && result.request) toast('已提交申请，等管理员在 DSH 面板 / 主网页同意后生效', true);
+    if (result && result.request) toast('已提交申请，打开功能需要管理员在 DSH 面板 / 主网页同意后生效', true);
+    else if (result && result.applied) toast('已关闭，立即生效', true);
     else if (result && result.welcome) toast('本群欢迎设置已保存', true);
     else toast('操作成功', true);
     return result;
@@ -269,7 +272,7 @@ function render() {
     ? '违禁词处罚：' + parts.join('，') + '。（次数由 DSH 面板 / 主网页设置，本页只显示）'
     : '违禁词处罚：未启用处罚（可在 DSH 面板 / 主网页设置违规几次禁言、几次踢出）。';
   const pending = data.pendingRequests || [];
-  const KIND_LABELS = { features: '功能开关', joinVerify: '人机验证', cleanup: '沉默清理', fortune: '今日运势' };
+  const KIND_LABELS = { features: '打开功能', joinVerify: '打开人机验证', cleanup: '打开沉默清理', fortune: '打开今日运势', welcome: '打开入群欢迎', manager: '添加代管' };
   $('pendingRequests').textContent = pending.length > 0
     ? '分群网页改动申请：' + pending.map((item) => KIND_LABELS[item.kind] || item.kind).join('、') + '（等待管理员在 DSH 面板 / 主网页同意）'
     : '分群网页改动申请：无';
