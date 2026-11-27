@@ -1295,15 +1295,46 @@ export async function apply(ctx, config) {
 
   // ── 入群欢迎 / 群管理 ───────────────────────────────────────────────────
 
+  /** 每个群独立的欢迎设置；没单独设置过的群沿用全局默认。 */
+  function getGroupWelcome(groupOpenid) {
+    const perGroup = state.groupWelcomes[groupOpenid]
+    if (perGroup && typeof perGroup === 'object') {
+      return {
+        enabled: perGroup.enabled === true,
+        text: String(perGroup.text ?? ''),
+        perGroup: true,
+        updatedAt: perGroup.updatedAt || '',
+      }
+    }
+    const only = Array.isArray(liveConfig.welcomeGroups) ? liveConfig.welcomeGroups : []
+    return {
+      enabled: liveConfig.welcomeEnabled === true && (only.length === 0 || only.includes(groupOpenid)),
+      text: String(liveConfig.welcomeText ?? ''),
+      perGroup: false,
+      updatedAt: '',
+    }
+  }
+
+  /** 保存某个群的欢迎设置（面板、主网页、分群网页都走这里）。 */
+  function saveGroupWelcome({ groupOpenid, enabled, text }) {
+    const openid = assertGroupOpenid(groupOpenid)
+    state.groupWelcomes[openid] = {
+      enabled: enabled === true,
+      text: String(text ?? '').slice(0, 1000),
+      updatedAt: new Date().toISOString(),
+    }
+    persistState()
+    return getGroupWelcome(openid)
+  }
+
   async function sendWelcome(data) {
-    if (!liveConfig.welcomeEnabled) return
     const groupOpenid = String(data.group_openid ?? '')
     const memberOpenid = String(data.member_openid ?? '')
     if (groupOpenid.length === 0) return
     if (isGroupFeatureBlocked(groupOpenid, 'welcome')) return
-    const only = Array.isArray(liveConfig.welcomeGroups) ? liveConfig.welcomeGroups : []
-    if (only.length > 0 && !only.includes(groupOpenid)) return
-    let text = String(liveConfig.welcomeText ?? '').trim()
+    const welcome = getGroupWelcome(groupOpenid)
+    if (!welcome.enabled) return
+    let text = String(welcome.text ?? '').trim()
     if (text.length === 0) return
     text = text
       .replaceAll('{member_openid}', memberOpenid)
@@ -3230,8 +3261,98 @@ export async function apply(ctx, config) {
     throw new Error('未知操作')
   }
 
-  function cancelPendingVerifications() {
-    let count = 0
+  const GROUP_REQUEST_KINDS = {
+    features: '功能开关',
+    joinVerify: '入群人机验证',
+    cleanup: '沉默低等级成员清理',
+    fortune: '今日运势',
+  }
+
+  /** 分群网页的权限/开关改动只生成申请，等面板或主网页同意后才真正生效。 */
+  function createGroupRequest({ groupOpenid, kind, payload }) {
+    const openid = assertGroupOpenid(groupOpenid)
+    if (!GROUP_REQUEST_KINDS[kind]) throw new Error('未知的申请类型')
+    const previous = state.groupChangeRequests.find((item) => item.groupOpenid === openid && item.kind === kind)
+    const entry = {
+      id: previous?.id ?? `req-${Date.now().toString(36)}-${randomInt(1000, 9999).toString(36)}`,
+      groupOpenid: openid,
+      groupName: state.targets.find((item) => item.scope === 'group' && item.openid === openid)?.name ?? '',
+      kind,
+      payload: payload && typeof payload === 'object' ? payload : {},
+      requestedAt: new Date().toISOString(),
+      requestedBy: '分群网页',
+    }
+    state.groupChangeRequests = state.groupChangeRequests.filter((item) => !(item.groupOpenid === openid && item.kind === kind))
+    state.groupChangeRequests.push(entry)
+    if (state.groupChangeRequests.length > 200) state.groupChangeRequests = state.groupChangeRequests.slice(-200)
+    persistState()
+    appendLog({
+      at: new Date().toISOString(), scope: 'group', openid,
+      name: entry.groupName || '分群网页申请',
+      text: `申请修改「${GROUP_REQUEST_KINDS[kind]}」`, ok: true, kind: 'group-request',
+    })
+    return entry
+  }
+
+  /** 把一条已同意的申请落成真实配置（逻辑与面板保存一致）。 */
+  function applyGroupRequest(request) {
+    const groupOpenid = request.groupOpenid
+    const payload = request.payload && typeof request.payload === 'object' ? request.payload : {}
+    if (request.kind === 'features') {
+      const features = Array.isArray(payload.features) ? payload.features : []
+      handleGroupBlocks({ action: 'save', groupOpenid, all: payload.all === true, features })
+      return
+    }
+    if (request.kind === 'joinVerify') {
+      const current = Array.isArray(liveConfig.joinVerifyGroups) ? liveConfig.joinVerifyGroups : []
+      const groups = payload.enabled === true
+        ? [...new Set([...current, groupOpenid])]
+        : current.filter((item) => item !== groupOpenid)
+      saveConfigPatch({ joinVerifyEnabled: groups.length > 0, joinVerifyGroups: groups })
+      return
+    }
+    if (request.kind === 'cleanup') {
+      const current = Array.isArray(liveConfig.inactiveCleanupGroups) ? liveConfig.inactiveCleanupGroups : []
+      const groups = payload.enabled === true
+        ? [...new Set([...current, groupOpenid])]
+        : current.filter((item) => item !== groupOpenid)
+      saveConfigPatch({
+        inactiveCleanupEnabled: groups.length > 0,
+        inactiveCleanupGroups: groups,
+        inactiveCleanupTime: String(payload.time ?? '03:00').slice(0, 5),
+        inactiveCleanupDays: Math.max(1, Math.min(3650, Number(payload.days) || 30)),
+      })
+      return
+    }
+    if (request.kind === 'fortune') {
+      const configured = Array.isArray(liveConfig.fortuneGroups) ? liveConfig.fortuneGroups : []
+      const allGroups = state.targets.filter((item) => item.scope === 'group').map((item) => item.openid)
+      const current = configured.length > 0 ? configured : allGroups
+      const groups = payload.enabled === true
+        ? [...new Set([...current, groupOpenid])]
+        : current.filter((item) => item !== groupOpenid)
+      saveConfigPatch({ fortuneEnabled: payload.enabled === true || groups.length > 0, fortuneGroups: groups })
+      return
+    }
+    throw new Error('未知的申请类型')
+  }
+
+  function resolveGroupRequest({ id, approve }) {
+    const request = state.groupChangeRequests.find((item) => item.id === String(id ?? ''))
+    if (!request) throw new Error('申请不存在或已处理')
+    if (approve === true) applyGroupRequest(request)
+    state.groupChangeRequests = state.groupChangeRequests.filter((item) => item.id !== request.id)
+    persistState()
+    appendLog({
+      at: new Date().toISOString(), scope: 'group', openid: request.groupOpenid,
+      name: request.groupName || '分群网页申请',
+      text: `${approve === true ? '同意' : '拒绝'}申请「${GROUP_REQUEST_KINDS[request.kind] || request.kind}」`,
+      ok: true, kind: 'group-request',
+    })
+    return { request, approved: approve === true }
+  }
+
+  function cancelPendingVerifications() {    let count = 0
     for (const entry of [...state.joinVerifications]) {
       clearVerification(entry)
       count += 1
