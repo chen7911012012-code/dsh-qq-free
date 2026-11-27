@@ -429,6 +429,17 @@ export async function apply(ctx, config) {
     ? state.groupPages.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.token === 'string').slice(-100)
     : []
   state.fortunes = state.fortunes !== null && typeof state.fortunes === 'object' ? state.fortunes : {}
+  // 每个群独立的入群欢迎（覆盖全局默认）
+  state.groupWelcomes = state.groupWelcomes !== null && typeof state.groupWelcomes === 'object' ? state.groupWelcomes : {}
+  for (const [key, value] of Object.entries(state.groupWelcomes)) {
+    if (!value || typeof value !== 'object' || typeof key !== 'string' || key.length === 0) delete state.groupWelcomes[key]
+  }
+  // 分群网页提交的权限/开关改动申请，需要面板或主网页同意后才会生效
+  state.groupChangeRequests = Array.isArray(state.groupChangeRequests)
+    ? state.groupChangeRequests
+      .filter((item) => item && typeof item.id === 'string' && typeof item.groupOpenid === 'string' && typeof item.kind === 'string')
+      .slice(-200)
+    : []
   // 分群网页公告：只展示在分群网页上，可选「仅显示一次」
   state.pageAnnouncements = Array.isArray(state.pageAnnouncements)
     ? state.pageAnnouncements
