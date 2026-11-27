@@ -273,8 +273,24 @@ function render() {
     : '违禁词处罚：未启用处罚（可在 DSH 面板 / 主网页设置违规几次禁言、几次踢出）。';
   const pending = data.pendingRequests || [];
   const KIND_LABELS = { features: '打开功能', joinVerify: '打开人机验证', cleanup: '打开沉默清理', fortune: '打开今日运势', welcome: '打开入群欢迎', manager: '添加代管' };
+  const FEATURE_NAMES = {
+    chat: 'AI 聊天', auto: '自主发言', welcome: '入群欢迎', joinNotice: '入群申请通知',
+    joinRequest: '入群申请处理', joinVerify: '入群人机验证', fortune: '今日运势',
+    commands: '群管理命令', moderation: '违禁词', info: '获取信息',
+  };
+  const describeRequest = (item) => {
+    if (item.kind === 'features') {
+      return '打开功能（' + ((item.payload && item.payload.unblock) || []).map((key) => FEATURE_NAMES[key] || key).join('、') + '）';
+    }
+    if (item.kind === 'manager') {
+      const name = (item.payload && item.payload.name) || ('成员' + String((item.payload && item.payload.memberOpenid) || '').slice(-6));
+      return '添加代管（' + name + '）';
+    }
+    if (item.kind === 'welcome') return '打开入群欢迎';
+    return KIND_LABELS[item.kind] || '功能申请';
+  };
   $('pendingRequests').textContent = pending.length > 0
-    ? '分群网页改动申请：' + pending.map((item) => KIND_LABELS[item.kind] || item.kind).join('、') + '（等待管理员在 DSH 面板 / 主网页同意）'
+    ? '分群网页改动申请：' + pending.map(describeRequest).join('、') + '（等待管理员在 DSH 面板 / 主网页同意）'
     : '分群网页改动申请：无';
   // @ 成员下拉：只列本群已知成员，按 openid 去重，保留当前选择
   const mention = $('mention');
