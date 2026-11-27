@@ -1722,6 +1722,18 @@ export async function apply(ctx, config) {
     }
   }
 
+  async function recallGroupMessage(groupOpenid, messageId) {
+    const id = String(messageId ?? '')
+    if (id.length === 0) return false
+    try {
+      await groupApi('DELETE', `/v2/groups/${encodeURIComponent(groupOpenid)}/messages/${encodeURIComponent(id)}`)
+      return true
+    } catch (error) {
+      logger.warn(`qq-free: 撤回未验证成员消息失败 ${error instanceof Error ? error.message : String(error)}`)
+      return false
+    }
+  }
+
   async function handleVerifyCode(data) {
     const groupOpenid = String(data.group_openid ?? data.group_id ?? '')
     const memberOpenid = String(data.author?.member_openid ?? '')
@@ -1734,6 +1746,8 @@ export async function apply(ctx, config) {
       if (await isGroupAllMuted(groupOpenid)) {
         return { handled: true, reply: '当前群仍在禁言中，禁言结束后再发送消息进行验证。' }
       }
+      // 禁言结束后发的第一条消息：撤回并 @ 对方开始验证
+      await recallGroupMessage(groupOpenid, data.id)
       await startJoinVerification(
         { group_openid: groupOpenid, member_openid: memberOpenid, username: entry.name },
         { skipMuteCheck: true, minutes: 5 },
@@ -1749,15 +1763,29 @@ export async function apply(ctx, config) {
       clearVerification(entry)
       return { handled: true, reply: '验证成功' }
     }
-    if (/^\d{4,8}$/.test(text)) {
+    // 只要不是正确的验证码，就撤回并记一次失败；失败两次踢出
+    const recalled = await recallGroupMessage(groupOpenid, data.id)
+    const failures = (Number(entry.failures) || 0) + 1
+    entry.failures = failures
+    entry.lastFailedAt = new Date().toISOString()
+    persistState()
+    appendLog({
+      at: new Date().toISOString(), scope: 'group', openid: groupOpenid, name: '入群验证',
+      text: `${entry.name || memberOpenid} 验证失败第 ${failures} 次${recalled ? '（已撤回消息）' : '（撤回失败）'}`,
+      ok: true, kind: 'join-verify',
+    })
+    if (failures >= 2) {
       pauseVerification(entry)
       return {
         handled: true,
-        reply: `验证码错误，已将 ${entry.name || '新成员'} 移出群聊。`,
+        reply: `验证失败 2 次，已将 ${entry.name || '新成员'} 移出群聊。`,
         afterReply: async () => { await kickUnverified(entry) },
       }
     }
-    return { handled: true, reply: '请 @机器人 回复图片中的 6 位验证码。' }
+    return {
+      handled: true,
+      reply: `已撤回消息：${entry.name || '新成员'} 还没完成人机验证，请 @机器人 回复图片中的 6 位验证码（再失败 1 次会被移出群聊）。`,
+    }
   }
 
   let cleanupBusy = false
