@@ -336,8 +336,7 @@ window.__ModuleLoader__.load({
             publicBaseUrl: data.remote.publicUrl || '',
           })
         }
-        if (modForm === null && data.moderation) {
-          setModForm({
+        if (modForm === null && data.moderation) {          setModForm({
             enabled: data.moderation.enabled === true,
             words: (data.moderation.words || []).join('\n'),
             groups: (data.moderation.groups || []).join('\n'),
@@ -1607,8 +1606,37 @@ window.__ModuleLoader__.load({
                 onChange: (event) => setWelcomeForm({ ...welcomeForm, groups: event.target.value }),
               }),
               h('div', { className: 'qqf-row' },
-                h('button', { className: 'qqf-btn qqf-btn--primary', disabled: busy !== '', onClick: () => void saveWelcome() }, busy === 'welcome' ? '保存中…' : '保存欢迎设置'),
+                h('button', { className: 'qqf-btn qqf-btn--primary', disabled: busy !== '', onClick: () => void saveWelcome() }, busy === 'welcome' ? '保存中…' : '保存全局默认'),
                 h('span', { className: 'qqf-hint' }, '欢迎消息是主动消息，可能受平台频率/配额限制')),
+
+              h('div', { className: 'qqf-split' }),
+              h('p', { className: 'qqf-hint' }, '每个群可以单独设置欢迎语（分群网页也能改自己群的）；下面每行单独保存，未单独设置的群沿用上面的全局默认。'),
+              groupTargets.length === 0
+                ? h('p', { className: 'qqf-empty' }, '还没有群目标。')
+                : h('ul', { className: 'qqf-targets' },
+                  groupTargets.map((target) => {
+                    const row = wgForms?.[target.openid] ?? { enabled: false, text: '' }
+                    const inherited = !(data.welcome?.perGroup?.[target.openid])
+                    return h('li', { key: target.id, className: 'qqf-target' },
+                      h('div', { className: 'qqf-target-main' },
+                        h('span', { className: 'qqf-target-name' }, `${target.name}${inherited ? ' · 未单独设置（沿用全局）' : ''}`),
+                        h('label', { className: 'qqf-row' },
+                          h('input', {
+                            type: 'checkbox', checked: row.enabled === true,
+                            onChange: (event) => setWgForms({ ...wgForms, [target.openid]: { ...row, enabled: event.target.checked } }),
+                          }),
+                          h('span', null, '启用本群欢迎')),
+                        h('input', {
+                          className: 'qqf-input', value: row.text ?? '',
+                          placeholder: '本群欢迎语（留空则用全局默认文案）',
+                          onChange: (event) => setWgForms({ ...wgForms, [target.openid]: { ...row, text: event.target.value } }),
+                        })),
+                      h('div', { className: 'qqf-row' },
+                        h('button', {
+                          className: 'qqf-btn qqf-btn--sm', disabled: busy !== '',
+                          onClick: () => void saveGroupWelcome(target),
+                        }, busy === `group-welcome-${target.openid}` ? '保存中…' : '保存本群')))
+                  })),
 
               h('div', { className: 'qqf-split' }),
               h('div', { className: 'qqf-row' },
