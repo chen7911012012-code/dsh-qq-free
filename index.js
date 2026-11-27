@@ -3290,10 +3290,21 @@ export async function apply(ctx, config) {
   }
 
   const GROUP_REQUEST_KINDS = {
-    features: '功能开关',
-    joinVerify: '入群人机验证',
-    cleanup: '沉默低等级成员清理',
-    fortune: '今日运势',
+    features: '打开功能',
+    joinVerify: '打开入群人机验证',
+    cleanup: '打开沉默低等级成员清理',
+    fortune: '打开今日运势',
+    welcome: '打开入群欢迎',
+    manager: '添加代管',
+  }
+
+  /** 打开某类功能 → 生成申请；关闭 → 直接生效。 */
+  function requestOrApplyToggle(groupOpenid, kind, enabled) {
+    if (enabled === true) {
+      return { request: createGroupRequest({ groupOpenid, kind, payload: { enabled: true } }) }
+    }
+    applyGroupRequest({ groupOpenid, kind, payload: { enabled: false } })
+    return { ok: true, applied: true }
   }
 
   /** 分群网页的权限/开关改动只生成申请，等面板或主网页同意后才真正生效。 */
@@ -3327,8 +3338,29 @@ export async function apply(ctx, config) {
     const groupOpenid = request.groupOpenid
     const payload = request.payload && typeof request.payload === 'object' ? request.payload : {}
     if (request.kind === 'features') {
-      const features = Array.isArray(payload.features) ? payload.features : []
-      handleGroupBlocks({ action: 'save', groupOpenid, all: payload.all === true, features })
+      // 只处理「打开」：把申请里的功能从本群屏蔽列表里去掉
+      const unblock = Array.isArray(payload.unblock) ? payload.unblock : []
+      const block = getGroupBlock(groupOpenid) ?? { all: false, features: [] }
+      const features = (Array.isArray(block.features) ? block.features : []).filter((item) => !unblock.includes(item))
+      handleGroupBlocks({ action: 'save', groupOpenid, all: false, features })
+      return
+    }
+    if (request.kind === 'welcome') {
+      saveGroupWelcome({ groupOpenid, enabled: true, text: payload.text })
+      return
+    }
+    if (request.kind === 'manager') {
+      const memberOpenid = assertMemberOpenid(payload.memberOpenid)
+      if (!isGroupDelegate(groupOpenid, memberOpenid)) {
+        state.groupManagers.push({
+          groupOpenid,
+          memberOpenid,
+          name: String(payload.name ?? '').slice(0, 60),
+          addedBy: '分群网页（已审批）',
+          addedAt: new Date().toISOString(),
+        })
+        persistState()
+      }
       return
     }
     if (request.kind === 'joinVerify') {
