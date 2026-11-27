@@ -883,18 +883,21 @@ const gpChatBlock = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIC
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'save-blocks', all: false, features: ['chat'] },
 })
 const gpChatOverview = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
-check('分群网页改功能开关只生成申请', gpChatBlock.status === 200 && Boolean(gpChatBlock.json().request)
-  && !(gpChatOverview.json().blocks?.features || []).includes('chat'))
-check('分群网页能读到自己的待同意申请', (gpChatOverview.json().pendingRequests || []).some((item) => item.kind === 'features'))
-const chatApprove = await call('/qq-free/group-requests', 'POST', { action: 'approve', id: gpChatBlock.json().request.id })
-check('同意申请后 AI 聊天关闭生效', chatApprove.status === 200 && chatApprove.body.state.groupBlocks.some((item) => item.groupOpenid === GROUP && (item.features || []).includes('chat')))
-const gpToggleDeny = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+check('分群网页关闭功能立即生效', gpChatBlock.status === 200 && !gpChatBlock.json().request
+  && (gpChatOverview.json().blocks?.features || []).includes('chat'))
+const gpChatEnable = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'save-blocks', all: false, features: [] },
 })
-const denyResult = await call('/qq-free/group-requests', 'POST', { action: 'reject', id: gpToggleDeny.json().request.id })
-check('拒绝申请后设置保持不变', denyResult.status === 200 && denyResult.body.state.groupBlocks.some((item) => item.groupOpenid === GROUP && (item.features || []).includes('chat')))
+const gpChatAfterEnable = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
+check('分群网页打开功能只生成申请', Boolean(gpChatEnable.json().request)
+  && (gpChatAfterEnable.json().blocks?.features || []).includes('chat'))
+check('申请里记录要打开的功能', (gpChatEnable.json().request.payload.unblock || []).includes('chat'))
+check('分群网页能读到自己的待同意申请', (gpChatAfterEnable.json().pendingRequests || []).some((item) => item.kind === 'features'))
+const chatApprove = await call('/qq-free/group-requests', 'POST', { action: 'approve', id: gpChatEnable.json().request.id })
+check('同意申请后 AI 聊天重新打开', chatApprove.status === 200
+  && !chatApprove.body.state.groupBlocks.some((item) => item.groupOpenid === GROUP && (item.features || []).includes('chat')))
 
-// 人机验证申请
+// 人机验证：打开要申请，关闭立即生效
 const gpVerifyReq = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'join-verify-save', enabled: true },
 })
@@ -903,11 +906,26 @@ check('分群网页开启人机验证只生成申请', gpVerifyReq.status === 20
   && !(beforeApprove.body.joinVerify.groups || []).includes(GROUP))
 const verifyApprove = await call('/qq-free/group-requests', 'POST', { action: 'approve', id: gpVerifyReq.json().request.id })
 check('同意后本群生效人机验证', verifyApprove.status === 200 && (verifyApprove.body.state.joinVerify.groups || []).includes(GROUP))
-const verifyReject = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+const verifyDisable = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'join-verify-save', enabled: false },
 })
-await call('/qq-free/group-requests', 'POST', { action: 'reject', id: verifyReject.json().request.id })
-check('拒绝关闭人机验证后仍保持开启', ((await call('/qq-free/state')).body.joinVerify.groups || []).includes(GROUP))
+check('分群网页关闭人机验证立即生效', verifyDisable.status === 200 && !verifyDisable.json().request
+  && !((await call('/qq-free/state')).body.joinVerify.groups || []).includes(GROUP))
+
+// 代管：添加要申请，移除立即生效
+const gpManagerReq = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'manager-add', memberOpenid: 'MANAGER00001', name: '代管甲' },
+})
+check('分群网页添加代管只生成申请', gpManagerReq.status === 200 && gpManagerReq.json().request?.kind === 'manager'
+  && !((await call('/qq-free/state')).body.groupManagers || []).some((item) => item.memberOpenid === 'MANAGER00001'))
+const managerApprove = await call('/qq-free/group-requests', 'POST', { action: 'approve', id: gpManagerReq.json().request.id })
+check('同意后代管生效', managerApprove.status === 200
+  && (managerApprove.body.state.groupManagers || []).some((item) => item.memberOpenid === 'MANAGER00001'))
+const managerRemove = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'manager-remove', memberOpenid: 'MANAGER00001' },
+})
+check('分群网页移除代管立即生效', managerRemove.status === 200 && !managerRemove.json().request
+  && !((await call('/qq-free/state')).body.groupManagers || []).some((item) => item.memberOpenid === 'MANAGER00001'))
 
 // 每个群独立的入群欢迎
 const welcomeA = await call('/qq-free/welcome-group', 'POST', { action: 'save', groupOpenid: GROUP, enabled: true, text: 'A 群专属欢迎' })
@@ -927,6 +945,18 @@ const welcomeFrame = sent.slice(beforeWelcome).find((item) => item.method === 'P
   && item.target.endsWith(`/v2/groups/${GROUP}/messages`)
   && String(item.body?.content ?? '').includes('分群网页改的欢迎'))
 check('入群欢迎用本群文案发送', Boolean(welcomeFrame), JSON.stringify(sent.slice(beforeWelcome).map((item) => item.body?.content)))
+
+// 入群欢迎：关闭立即生效，打开要申请
+const gpWelcomeOff = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'welcome-save', enabled: false, text: '先关掉' },
+})
+check('分群网页关闭本群欢迎立即生效', gpWelcomeOff.status === 200 && !gpWelcomeOff.json().request && gpWelcomeOff.json().welcome?.enabled === false)
+const gpWelcomeOn = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'welcome-save', enabled: true, text: '申请打开的欢迎' },
+})
+check('分群网页打开本群欢迎需要申请', Boolean(gpWelcomeOn.json().request) && gpWelcomeOn.json().request.kind === 'welcome')
+const welcomeApprove = await call('/qq-free/group-requests', 'POST', { action: 'approve', id: gpWelcomeOn.json().request.id })
+check('同意后本群欢迎打开', welcomeApprove.status === 200 && welcomeApprove.body.state.welcome.perGroup[GROUP]?.enabled === true)
 await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: true, expiresAt: '2020-01-01T00:00:00.000Z' })
 const gpExpired = await httpCall(`${remoteBase}/g/${encodeURIComponent(groupToken)}`)
 check('分群网页过期', gpExpired.status === 410)
