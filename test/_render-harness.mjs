@@ -51,7 +51,24 @@ for (const [label, seed] of [['full', snapshot], ['empty', {}]]) {
   }
 }
 
-index = 0; seeds = [snapshot]
-const t = panel.component({})
-console.log('type=' + (typeof t.type === 'function' ? (t.type.name || 'fn') : t.type) + ' childCount=' + (Array.isArray(t.children) ? t.children.length : String(t.children)))
-if (Array.isArray(t.children)) t.children.slice(0, 3).forEach((c, i) => console.log(i + ': ' + (c && c.type ? String(c.type) : typeof c) + ' ' + (c && c.props ? JSON.stringify(c.props).slice(0, 80) : '')))
+
+function walk(node, out) {
+  if (node === null || node === undefined) return
+  if (typeof node === 'string' || typeof node === 'number') { out.texts.push(String(node)); return }
+  if (Array.isArray(node)) { for (const item of node) walk(item, out); return }
+  if (typeof node === 'object' && node.type) { out.nodes += 1; walk(node.children, out) }
+}
+const wrap = panel.component({})
+const Inner = wrap.type
+for (const [label, seed] of [['full', snapshot], ['empty', {}]]) {
+  index = 0
+  seeds = [seed]
+  try {
+    const tree = Inner({})
+    const out = { nodes: 0, texts: [] }
+    walk(tree, out)
+    console.log(label + ': ok nodes=' + out.nodes + ' has申请=' + out.texts.some((t) => t.includes('分群网页申请')) + ' has欢迎=' + out.texts.some((t) => t.includes('入群欢迎与群管理')) + ' texts=' + out.texts.length)
+  } catch (error) {
+    console.log(label + ': THREW ' + error.message)
+  }
+}
