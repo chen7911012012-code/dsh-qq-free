@@ -32,3 +32,21 @@ for (const [label, seed] of [['full', snapshot], ['empty', {}]]) {
     console.log(label + ': THREW ' + error.message)
   }
 }
+function walk(node, out) {
+  if (node === null || node === undefined) return
+  if (typeof node === 'string' || typeof node === 'number') { out.texts.push(String(node)); return }
+  if (Array.isArray(node)) { for (const item of node) walk(item, out); return }
+  if (typeof node === 'object') { if (node.type) out.types.push(String(typeof node.type === 'function' ? (node.type.name || 'fn') : node.type)); walk(node.children, out) }
+}
+for (const [label, seed] of [['full', snapshot], ['empty', {}]]) {
+  index = 0
+  seeds = [seed]
+  try {
+    const tree = panel.component({})
+    const out = { texts: [], types: [] }
+    walk(tree, out)
+    console.log(label + ': ok types=' + out.types.length + ' has申请=' + out.texts.some((t) => t.includes('分群网页申请')) + ' has欢迎=' + out.texts.some((t) => t.includes('入群欢迎与群管理')))
+  } catch (error) {
+    console.log(label + ': THREW ' + error.message)
+  }
+}
