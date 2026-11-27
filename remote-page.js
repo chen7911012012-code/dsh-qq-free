@@ -485,22 +485,37 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
     }
 
     var requestList = $('groupRequestsList'); requestList.innerHTML = ''
+    var featureNames = {
+      chat: 'AI 聊天', auto: '自主发言', welcome: '入群欢迎', joinNotice: '入群申请通知',
+      joinRequest: '入群申请处理', joinVerify: '入群人机验证', fortune: '今日运势',
+      commands: '群管理命令', moderation: '违禁词', info: '获取信息',
+    }
     ;(state.groupChangeRequests || []).forEach(function (req) {
-      var kindLabel = { features: '打开功能', joinVerify: '打开入群人机验证', cleanup: '打开沉默清理', fortune: '打开今日运势', welcome: '打开入群欢迎', manager: '添加代管' }[req.kind] || req.kind
+      var kindLabel = { features: '打开功能', joinVerify: '打开入群人机验证', cleanup: '打开沉默清理', fortune: '打开今日运势', welcome: '打开入群欢迎', manager: '添加代管' }[req.kind] || '未知申请'
+      var target = (state.targets || []).filter(function (t) { return t.openid === req.groupOpenid })[0]
+      var groupName = req.groupName || (target && target.name) || '未知群'
+      var memberName = '该成员'
+      if (req.kind === 'manager') {
+        if (req.payload && req.payload.name) memberName = req.payload.name
+        else {
+          var member = (state.members || []).filter(function (m) { return m.openid === (req.payload && req.payload.memberOpenid) })[0]
+          if (member && member.name) memberName = member.name
+        }
+      }
       var detail = req.kind === 'features'
-        ? '打开：' + ((req.payload && req.payload.unblock || []).join('、') || '无')
+        ? '打开：' + (((req.payload && req.payload.unblock) || []).map(function (key) { return featureNames[key] || key }).join('、') || '无')
         : req.kind === 'welcome'
-          ? '开启欢迎，文案：' + ((req.payload && req.payload.text) || '（空）')
+          ? '开启入群欢迎，文案：' + ((req.payload && req.payload.text) || '（空）')
           : req.kind === 'manager'
-            ? '代管：' + ((req.payload && req.payload.name) || '') + ' ' + ((req.payload && req.payload.memberOpenid) || '')
+            ? '代管：' + memberName + '（' + String((req.payload && req.payload.memberOpenid) || '').slice(-6) + '）'
             : req.kind === 'cleanup'
-              ? '开启清理 · ' + ((req.payload && req.payload.time) || '03:00') + ' · ' + ((req.payload && req.payload.days) || 30) + ' 天'
+              ? '开启清理 · ' + ((req.payload && req.payload.time) || '03:00') + ' · 未发言 ' + ((req.payload && req.payload.days) || 30) + ' 天'
               : '开启'
       var div = document.createElement('div'); div.className = 'item'
       var main = document.createElement('div'); main.className = 'item-main'
       var q = document.createElement('div'); q.className = 'q'
-      q.textContent = (req.groupName || req.groupOpenid) + ' · ' + kindLabel + ' · ' + new Date(req.requestedAt).toLocaleString('zh-CN', { hour12: false })
-      var meta = document.createElement('div'); meta.className = 'mono'; meta.textContent = detail
+      q.textContent = groupName + ' · ' + kindLabel + ' · ' + new Date(req.requestedAt).toLocaleString('zh-CN', { hour12: false })
+      var meta = document.createElement('div'); meta.className = 'muted'; meta.textContent = detail
       main.appendChild(q); main.appendChild(meta)
       var actions = document.createElement('div'); actions.className = 'item-actions'
       var ok = document.createElement('button'); ok.className = 'sm'; ok.textContent = '同意'
