@@ -3267,21 +3267,20 @@ export async function apply(ctx, config) {
       return runAnnouncements(String(body.id ?? ''))
     }
     if (action === 'fortune-save') {
-      return { request: createGroupRequest({ groupOpenid, kind: 'fortune', payload: { enabled: body.enabled === true } }) }
+      return requestOrApplyToggle(groupOpenid, 'fortune', body.enabled === true)
     }
     if (action === 'cleanup-save') {
-      return {
-        request: createGroupRequest({
-          groupOpenid,
-          kind: 'cleanup',
-          payload: {
-            enabled: body.enabled === true,
-            time: String(body.time ?? '03:00').slice(0, 5),
-            days: Math.max(1, Math.min(3650, Number(body.days) || 30)),
-            maxLevel: Math.max(0, Math.min(100, Number(body.maxLevel) || 1)),
-          },
-        }),
+      const payload = {
+        enabled: body.enabled === true,
+        time: String(body.time ?? '03:00').slice(0, 5),
+        days: Math.max(1, Math.min(3650, Number(body.days) || 30)),
+        maxLevel: Math.max(0, Math.min(100, Number(body.maxLevel) || 1)),
       }
+      if (payload.enabled !== true) {
+        applyGroupRequest({ groupOpenid, kind: 'cleanup', payload })
+        return { ok: true, applied: true }
+      }
+      return { request: createGroupRequest({ groupOpenid, kind: 'cleanup', payload }) }
     }
     if (action === 'group-info') {
       return { text: await groupInfoReply(groupOpenid) }
