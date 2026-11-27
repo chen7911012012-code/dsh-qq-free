@@ -98,12 +98,14 @@ section{display:none}section.on{display:block}
       <div class="row" style="margin-top:10px"><button id="blockBtn">保存功能开关</button></div>
       <p class="muted">关闭「入群申请处理」后，本群不再记录/通知入群申请；关闭「入群人机验证」后，本群新成员不验证。</p>
       <p class="muted" id="modPolicy">违禁词处罚：加载中…</p>
+      <p class="muted" id="pendingRequests">分群网页改动申请：无</p>
     </div>
     <div class="card">
-      <h2>入群欢迎</h2>
+      <h2>入群欢迎（本群独立）</h2>
+      <p class="muted">这里的欢迎设置只对本群生效，保存后立即生效（不需要申请）。</p>
       <label class="check"><input type="checkbox" id="welcomeOn"> 启用本群欢迎</label>
-      <textarea id="welcomeText" placeholder="欢迎语"></textarea>
-      <div class="row" style="margin-top:8px"><button id="welcomeBtn">保存欢迎设置</button></div>
+      <textarea id="welcomeText" placeholder="本群欢迎语，支持 {member_openid} / {group_openid}"></textarea>
+      <div class="row" style="margin-top:8px"><button id="welcomeBtn">保存本群欢迎</button></div>
     </div>
     <div class="card">
       <h2>入群人机验证</h2>
@@ -180,7 +182,9 @@ async function act(action, body) {
   try {
     const result = await api('/gapi/action?token=' + encodeURIComponent(TOKEN), { method: 'POST', body: JSON.stringify({ action, ...(body || {}) }) });
     void load();
-    toast('操作成功', true);
+    if (result && result.request) toast('已提交申请，等管理员在 DSH 面板 / 主网页同意后生效', true);
+    else if (result && result.welcome) toast('本群欢迎设置已保存', true);
+    else toast('操作成功', true);
     return result;
   } catch (error) {
     toast(error.status === 403 ? '你无权限' : error.message);
