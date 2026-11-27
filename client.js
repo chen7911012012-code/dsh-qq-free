@@ -258,6 +258,8 @@ window.__ModuleLoader__.load({
       const [annImage, setAnnImage] = useState(null)
       // 分群网页公告：只在分群网页上显示，可选「仅显示一次」
       const [paForm, setPaForm] = useState({ text: '', mode: 'once', groups: [] })
+      // 每个群的欢迎设置（面板逐群编辑）
+      const [wgForms, setWgForms] = useState(null)
       const [ownerId, setOwnerId] = useState(null)
       const [gmGroup, setGmGroup] = useState('')
       const [gmMember, setGmMember] = useState('')
