@@ -429,6 +429,8 @@ export async function apply(ctx, config) {
     ? state.groupPages.filter((item) => item && typeof item.groupOpenid === 'string' && typeof item.token === 'string').slice(-100)
     : []
   state.fortunes = state.fortunes !== null && typeof state.fortunes === 'object' ? state.fortunes : {}
+  // 每个群独立的「入群问答自动通过」：答案一致的入群申请直接同意
+  state.joinAnswers = state.joinAnswers !== null && typeof state.joinAnswers === 'object' ? state.joinAnswers : {}
   // 每个群独立的入群欢迎（覆盖全局默认）
   state.groupWelcomes = state.groupWelcomes !== null && typeof state.groupWelcomes === 'object' ? state.groupWelcomes : {}
   for (const [key, value] of Object.entries(state.groupWelcomes)) {
@@ -1350,7 +1352,83 @@ export async function apply(ctx, config) {
     }
   }
 
-  function recordJoinRequest(data) {
+  /** 入群问答答案比对：全角半角、空格、大小写都不影响。 */
+  function normalizeAnswer(value) {
+    return String(value ?? '').normalize('NFKC').replace(/\s+/g, '').toLowerCase()
+  }
+
+  function getJoinAnswerRule(groupOpenid) {
+    const rule = state.joinAnswers[groupOpenid]
+    if (!rule || rule.enabled !== true) return null
+    const answer = String(rule.answer ?? '').trim()
+    if (answer.length === 0) return null
+    return { enabled: true, question: String(rule.question ?? ''), answer }
+  }
+
+  function saveJoinAnswer({ groupOpenid, enabled, question, answer }) {
+    const openid = assertGroupOpenid(groupOpenid)
+    state.joinAnswers[openid] = {
+      enabled: enabled === true,
+      question: String(question ?? '').slice(0, 200),
+      answer: String(answer ?? '').slice(0, 200),
+      updatedAt: new Date().toISOString(),
+    }
+    persistState()
+    return state.joinAnswers[openid]
+  }
+
+  function joinAnswersMatch(rule, entry) {
+    const expected = normalizeAnswer(rule.answer)
+    if (expected.length === 0) return false
+    const candidates = [entry.verifyMessage]
+    for (const qa of entry.verifyQa ?? []) candidates.push(qa.answer)
+    return candidates.some((value) => normalizeAnswer(value) === expected)
+  }
+
+  async function autoApproveJoinRequest(entry) {
+    const groupPath = `/v2/groups/${encodeURIComponent(entry.groupOpenid)}`
+    await groupApi('POST', `${groupPath}/approval_join_request/${encodeURIComponent(entry.memberOpenid)}`, {
+      op: 'approve',
+      ...(entry.joinRequestId ? { join_request_id: entry.joinRequestId } : {}),
+    })
+    state.pendingJoins = state.pendingJoins.filter((item) => !(item.groupOpenid === entry.groupOpenid && item.memberOpenid === entry.memberOpenid))
+    state.lastApproval = {
+      at: new Date().toISOString(),
+      operator: '自动验证',
+      action: 'approve',
+      memberOpenid: entry.memberOpenid,
+      username: entry.username,
+      groupOpenid: entry.groupOpenid,
+    }
+    persistState()
+    appendLog({
+      at: new Date().toISOString(),
+      scope: 'group',
+      openid: entry.groupOpenid,
+      name: '入群审批',
+      text: `自动通过 ${entry.username || entry.memberOpenid}（入群问答答案正确）`,
+      ok: true,
+      kind: 'join-approval',
+    })
+    logger.info(`qq-free: 入群问答匹配，已自动通过 ${entry.username || entry.memberOpenid}`)
+  }
+
+  function queueJoinRequest(entry) {
+    // 有新的入群申请时，旧的直接作废，只保留这一条
+    state.pendingJoins = [entry]
+    persistState()
+    logger.info(`qq-free: 收到入群申请 ${entry.username || entry.memberOpenid}（旧申请已作废）`)
+    if (liveConfig.joinNoticeEnabled && !isGroupFeatureBlocked(entry.groupOpenid, 'joinNotice')) {
+      void sendJoinNotice(entry).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        state.lastError = `入群申请通知发送失败：${message}`
+        persistState()
+        logger.warn(`qq-free: 入群申请通知发送失败: ${message}`)
+      })
+    }
+  }
+
+  async function recordJoinRequest(data) {
     const groupOpenid = String(data.group_openid ?? '')
     if (isGroupFeatureBlocked(groupOpenid, 'joinRequest')) return
     const entry = {
@@ -1373,18 +1451,17 @@ export async function apply(ctx, config) {
       receivedAt: new Date().toISOString(),
     }
     if (entry.groupOpenid.length === 0 || entry.memberOpenid.length === 0) return
-    // 有新的入群申请时，旧的直接作废，只保留这一条
-    state.pendingJoins = [entry]
-    persistState()
-    logger.info(`qq-free: 收到入群申请 ${entry.username || entry.memberOpenid}（旧申请已作废）`)
-    if (liveConfig.joinNoticeEnabled && !isGroupFeatureBlocked(entry.groupOpenid, 'joinNotice')) {
-      void sendJoinNotice(entry).catch((error) => {
-        const message = error instanceof Error ? error.message : String(error)
-        state.lastError = `入群申请通知发送失败：${message}`
-        persistState()
-        logger.warn(`qq-free: 入群申请通知发送失败: ${message}`)
-      })
+    // 配置了入群问答的群：申请人答案一致就直接同意
+    const rule = getJoinAnswerRule(entry.groupOpenid)
+    if (rule && joinAnswersMatch(rule, entry)) {
+      try {
+        await autoApproveJoinRequest(entry)
+        return
+      } catch (error) {
+        logger.warn(`qq-free: 自动通过入群申请失败，转人工 ${error instanceof Error ? error.message : String(error)}`)
+      }
     }
+    queueJoinRequest(entry)
   }
 
   function joinNoticeCode(entry) {
