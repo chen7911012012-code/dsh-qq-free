@@ -6,6 +6,8 @@
  */
 
 import { readFileSync } from 'node:fs'
+import { renderGroupPage } from '../group-page.js'
+import { REMOTE_PAGE } from '../remote-page.js'
 
 let captured = null
 globalThis.window = {
@@ -107,6 +109,22 @@ try {
   check('面板能用真实快照完整渲染', nodes > 100, `nodes=${nodes}`)
 } catch (error) {
   check('面板能用真实快照完整渲染', false, error.message)
+}
+
+// 网页是模板字符串拼出来的内联脚本：模板里的 \/ 会被吃掉，导致正则变成注释把整段脚本搞挂。
+// 这里直接把两个页面的内联脚本解析一遍，语法错误能立刻发现。
+function inlineScript(html) {
+  const start = html.indexOf('<script>') + '<script>'.length
+  const end = html.lastIndexOf('</script>')
+  return html.slice(start, end)
+}
+for (const [label, html] of [['分群网页', renderGroupPage('TESTTOKEN')], ['主网页', REMOTE_PAGE]]) {
+  try {
+    new Function(inlineScript(html))
+    check(`${label}内联脚本语法正确`, true)
+  } catch (error) {
+    check(`${label}内联脚本语法正确`, false, error.message)
+  }
 }
 
 console.log(failures === 0 ? '\n全部通过' : `\n${failures} 项失败`)
