@@ -907,6 +907,33 @@ const chatApprove = await call('/qq-free/group-requests', 'POST', { action: 'app
 check('同意申请后 AI 聊天重新打开', chatApprove.status === 200
   && !chatApprove.body.state.groupBlocks.some((item) => item.groupOpenid === GROUP && (item.features || []).includes('chat')))
 
+// 新群默认「全部屏蔽」：分群网页应看到全部关闭，任何开启都要申请
+await call('/qq-free/group-blocks', 'POST', { action: 'save', groupOpenid: GROUP, all: true, features: [] })
+const gpAllBlocked = await httpCall(`${remoteBase}/gapi/overview?token=${encodeURIComponent(groupToken)}`)
+check('分群网页读到全部屏蔽', gpAllBlocked.json().blocks?.all === true)
+check('分群网页有全部屏蔽说明位', (await httpCall(`${remoteBase}/g/${encodeURIComponent(groupToken)}`)).text.includes('id="allBlockedHint"'))
+const gpAllFeatures = gpAllBlocked.json().features || []
+const gpEnableAll = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'save-blocks', all: false, features: [] },
+})
+check('取消全部屏蔽只生成申请', Boolean(gpEnableAll.json().request)
+  && (gpEnableAll.json().request.payload.unblock || []).length === gpAllFeatures.length)
+const gpEnableOne = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: { action: 'save-blocks', all: false, features: gpAllFeatures.filter((key) => key !== 'chat') },
+})
+check('全部屏蔽时打开单个功能也要申请', Boolean(gpEnableOne.json().request)
+  && (gpEnableOne.json().request.payload.unblock || []).includes('chat'))
+const gpBlockedVerify = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'join-verify-save', enabled: true },
+})
+check('全部屏蔽时不能直接打开人机验证', gpBlockedVerify.status === 400 && /全部功能/.test(String(gpBlockedVerify.json().error ?? '')))
+const gpEnableOneApprove = await call('/qq-free/group-requests', 'POST', { action: 'approve', id: gpEnableOne.json().request.id })
+check('同意后只打开申请里的功能', gpEnableOneApprove.status === 200
+  && !gpEnableOneApprove.body.state.groupBlocks.some((item) => item.groupOpenid === GROUP && (item.features || []).includes('chat'))
+  && gpEnableOneApprove.body.state.groupBlocks.some((item) => item.groupOpenid === GROUP && item.all !== true && (item.features || []).includes('auto')))
+await call('/qq-free/group-blocks', 'POST', { action: 'save', groupOpenid: GROUP, all: false, features: [] })
+
 // 人机验证：打开要申请，关闭立即生效
 const gpVerifyReq = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'join-verify-save', enabled: true },
