@@ -432,7 +432,7 @@ $('mediaFile').onchange = (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
   if (file.size > 5 * 1024 * 1024) { toast('图片超过 5MB'); event.target.value = ''; return; }
-  if (!/^image\//.test(file.type || '')) { toast('请选择图片文件'); event.target.value = ''; return; }
+  if (file.type.indexOf('image/') !== 0) { toast('请选择图片文件'); event.target.value = ''; return; }
   const reader = new FileReader();
   reader.onload = () => {
     mediaFile = { name: file.name, data: String(reader.result || '') };
