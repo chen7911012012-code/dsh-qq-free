@@ -111,6 +111,14 @@ section{display:none}section.on{display:block}
       <div class="row" style="margin-top:8px"><button id="welcomeBtn">保存本群欢迎</button></div>
     </div>
     <div class="card">
+      <h2>入群问答自动通过（本群）</h2>
+      <p class="muted">入群申请里填写的答案与这里一致就直接同意（忽略空格/大小写/全角半角）。打开需要申请，关闭立即生效。</p>
+      <label class="check"><input type="checkbox" id="joinAnswerOn"> 启用本群自动通过</label>
+      <input id="joinAnswerQuestion" placeholder="问题（仅展示，例如：入群暗号是什么）">
+      <input id="joinAnswerAnswer" placeholder="正确答案（必填）">
+      <div class="row" style="margin-top:8px"><button id="joinAnswerSave">保存本群问答</button></div>
+    </div>
+    <div class="card">
       <h2>入群人机验证</h2>
       <p class="muted">打开功能需要提交申请，管理员在 DSH 面板 / 主网页同意后生效；关闭功能立即生效。</p>
       <label class="check"><input type="checkbox" id="verifyOn"> 在本群启用图片验证码验证</label>
@@ -273,7 +281,7 @@ function render() {
     ? '违禁词处罚：' + parts.join('，') + '。（次数由 DSH 面板 / 主网页设置，本页只显示）'
     : '违禁词处罚：未启用处罚（可在 DSH 面板 / 主网页设置违规几次禁言、几次踢出）。';
   const pending = data.pendingRequests || [];
-  const KIND_LABELS = { features: '打开功能', joinVerify: '打开人机验证', cleanup: '打开沉默清理', fortune: '打开今日运势', welcome: '打开入群欢迎', manager: '添加代管' };
+  const KIND_LABELS = { features: '打开功能', joinVerify: '打开人机验证', cleanup: '打开沉默清理', fortune: '打开今日运势', welcome: '打开入群欢迎', manager: '添加代管', joinAnswer: '打开入群问答自动通过' };
   const FEATURE_NAMES = {
     chat: 'AI 聊天', auto: '自主发言', welcome: '入群欢迎', joinNotice: '入群申请通知',
     joinRequest: '入群申请处理', joinVerify: '入群人机验证', fortune: '今日运势',
@@ -318,6 +326,15 @@ function render() {
   $('welcomeOn').checked = allBlocked ? false : data.welcome?.enabled === true;
   $('welcomeText').value = data.welcome?.text || '';
   $('verifyOn').checked = allBlocked ? false : data.joinVerify?.enabled === true;
+  // 入群问答自动通过（本群）
+  const joinAnswer = data.joinAnswer || {};
+  $('joinAnswerOn').checked = allBlocked ? false : joinAnswer.enabled === true;
+  $('joinAnswerQuestion').value = joinAnswer.question || '';
+  $('joinAnswerAnswer').value = joinAnswer.answer || '';
+  for (const id of ['joinAnswerOn', 'joinAnswerQuestion', 'joinAnswerAnswer', 'joinAnswerSave']) {
+    const el = $(id);
+    if (el) el.disabled = allBlocked;
+  }
   $('cleanupOn').checked = allBlocked ? false : data.cleanup?.enabled === true;
   $('cleanupTime').value = data.cleanup?.time || '03:00';
   $('cleanupDays').value = data.cleanup?.days || 30;
@@ -395,6 +412,11 @@ $('aiChatSave').onclick = () => {
   act('save-blocks', { all: false, features: [...blocked] });
 };
 $('welcomeBtn').onclick = () => act('welcome-save', { enabled: $('welcomeOn').checked, text: $('welcomeText').value });
+$('joinAnswerSave').onclick = () => act('join-answer-save', {
+  enabled: $('joinAnswerOn').checked,
+  question: $('joinAnswerQuestion').value,
+  answer: $('joinAnswerAnswer').value,
+});
 $('verifyBtn').onclick = () => act('join-verify-save', { enabled: $('verifyOn').checked });
 $('cancelVerifyBtn').onclick = () => act('join-verify-cancel', {});
 $('cleanupBtn').onclick = () => act('cleanup-save', { enabled: $('cleanupOn').checked, time: $('cleanupTime').value, days: Number($('cleanupDays').value) || 30 });
