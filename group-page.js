@@ -392,7 +392,7 @@ $('aiChatSave').onclick = () => {
   const blocked = new Set(allBlocked ? (data.features || []) : (data.blocks?.features || []));
   if ($('aiChatOn').checked) blocked.delete('chat'); else blocked.add('chat');
   if ($('autoOn').checked) blocked.delete('auto'); else blocked.add('auto');
-  act('save-blocks', { all: false, features: [...blocked, ].filter((key) => key === 'chat' || key === 'auto' || (data.features || []).includes(key)) });
+  act('save-blocks', { all: false, features: [...blocked] });
 };
 $('welcomeBtn').onclick = () => act('welcome-save', { enabled: $('welcomeOn').checked, text: $('welcomeText').value });
 $('verifyBtn').onclick = () => act('join-verify-save', { enabled: $('verifyOn').checked });
