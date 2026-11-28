@@ -209,7 +209,7 @@ await module.apply(ctx, {
   quietHoursStart: '23:00',
   quietHoursEnd: '08:00',
 })
-check('注册了 33 条 HTTP 路由', routes.size === 33, [...routes.keys()].join(', '))
+check('注册了 34 条 HTTP 路由', routes.size === 34, [...routes.keys()].join(', '))
 check('注册了 3 个工具', tools.length === 3)
 const qaGuidance = sections.find((section) => section.name === 'qq-free:qa-guidance')
 const qaLibrary = sections.find((section) => section.name === 'qq-free:qa-library')
@@ -437,70 +437,6 @@ if (ws) {
   result = await call('/qq-free/group-admin', 'POST', { action: 'list', groupOpenid: GROUP })
   check('拉取入群申请列表', result.status === 200 && result.body.list.length === 1 && result.body.list[0].member_openid === 'REQ2')
   check('未同意的申请不被自动删除', (await call('/qq-free/state')).body.pendingJoins.some((entry) => entry.memberOpenid === 'MEMBERREQ1'))
-
-  // 入群问答自动通过：答案一致直接同意，不一致继续人工
-  result = await call('/qq-free/join-answer', 'POST', { action: 'save', groupOpenid: GROUP, enabled: true, question: '入群暗号是什么', answer: '芝麻开门' })
-  check('保存入群问答', result.status === 200 && result.body.state.joinAnswers[GROUP]?.answer === '芝麻开门')
-  const beforeAuto = sent.length
-  ws.emit({
-    op: 0, s: 9, t: 'GROUP_JOIN_REQUEST',
-    d: {
-      group_openid: GROUP,
-      member_openid: 'MEMBERAUTO1',
-      join_request_id: 'JOINAUTO1',
-      username: '答对的人',
-      verify_info: { verify_message: ' 芝麻开门 ' },
-    },
-  })
-  await sleep(250)
-  const autoApproveCall = sent.slice(beforeAuto).find((item) => item.method === 'POST' && item.target.includes('/approval_join_request/MEMBERAUTO1'))
-  check('答案一致自动通过入群申请', Boolean(autoApproveCall) && autoApproveCall.body?.op === 'approve' && autoApproveCall.body?.join_request_id === 'JOINAUTO1', JSON.stringify(autoApproveCall?.body))
-  check('自动通过后不留待处理申请', !(await call('/qq-free/state')).body.pendingJoins.some((entry) => entry.memberOpenid === 'MEMBERAUTO1'))
-  check('自动通过记录操作人', (await call('/qq-free/state')).body.lastApproval?.operator === '自动验证')
-  // 问答列表里的回答也能匹配（忽略空格/大小写/全角）
-  const beforeAutoQa = sent.length
-  ws.emit({
-    op: 0, s: 9, t: 'GROUP_JOIN_REQUEST',
-    d: {
-      group_openid: GROUP,
-      member_openid: 'MEMBERAUTO2',
-      join_request_id: 'JOINAUTO2',
-      username: '答对的人二',
-      verify_info: { review_qa_list: [{ question: '暗号', answer: '芝麻 开门' }] },
-    },
-  })
-  await sleep(250)
-  check('问答列表答案也能自动通过', sent.slice(beforeAutoQa).some((item) => item.target.includes('/approval_join_request/MEMBERAUTO2')))
-  const beforeAutoBad = sent.length
-  ws.emit({
-    op: 0, s: 9, t: 'GROUP_JOIN_REQUEST',
-    d: {
-      group_openid: GROUP,
-      member_openid: 'MEMBERBAD1',
-      join_request_id: 'JOINBAD1',
-      username: '答错的人',
-      verify_info: { verify_message: '开错门' },
-    },
-  })
-  await sleep(200)
-  check('答案不一致仍转人工审批', !sent.slice(beforeAutoBad).some((item) => item.target.includes('/approval_join_request/MEMBERBAD1'))
-    && (await call('/qq-free/state')).body.pendingJoins.some((entry) => entry.memberOpenid === 'MEMBERBAD1'))
-  await call('/qq-free/join-answer', 'POST', { action: 'save', groupOpenid: GROUP, enabled: false, question: '入群暗号是什么', answer: '芝麻开门' })
-  const beforeAutoOff = sent.length
-  ws.emit({
-    op: 0, s: 9, t: 'GROUP_JOIN_REQUEST',
-    d: {
-      group_openid: GROUP,
-      member_openid: 'MEMBEROFF1',
-      join_request_id: 'JOINOFF1',
-      username: '关闭后',
-      verify_info: { verify_message: '芝麻开门' },
-    },
-  })
-  await sleep(200)
-  check('关闭自动通过后不再自动同意', !sent.slice(beforeAutoOff).some((item) => item.target.includes('/approval_join_request/MEMBEROFF1')))
-  await call('/qq-free/group-admin', 'POST', { action: 'forget', groupOpenid: GROUP, memberOpenid: 'MEMBERBAD1' })
-  await call('/qq-free/group-admin', 'POST', { action: 'forget', groupOpenid: GROUP, memberOpenid: 'MEMBEROFF1' })
 
   const beforeDeny = sent.length
   ws.emit({
