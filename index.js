@@ -4669,6 +4669,17 @@ export async function apply(ctx, config) {
 
     disposers.push(webServer.register({
       kind: 'exact',
+      path: '/qq-free/join-answer',
+      handler: route(async (req, res) => {
+        if (!requirePost(req, res)) return
+        const body = await readJsonBody(req)
+        const result = handleJoinAnswer(body)
+        sendJson(res, 200, { ok: true, ...result, state: snapshot() })
+      }),
+    }))
+
+    disposers.push(webServer.register({
+      kind: 'exact',
       path: '/qq-free/welcome-group',
       handler: route(async (req, res) => {
         if (!requirePost(req, res)) return
