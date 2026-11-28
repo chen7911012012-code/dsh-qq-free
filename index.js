@@ -3304,8 +3304,7 @@ export async function apply(ctx, config) {
       }
       return { ok: true, applied: true }
     }
-    if (action === 'welcome-save') {
-      // 入群欢迎每个群独立：关闭、或本来就开着时改文案，直接生效；从关注销到打开才算「打开功能」，要申请
+    if (action === 'welcome-save') {      // 入群欢迎每个群独立：关闭、或本来就开着时改文案，直接生效；从关注销到打开才算「打开功能」，要申请
       const current = getGroupWelcome(groupOpenid)
       const wantsEnable = body.enabled === true
       if (wantsEnable && current.enabled !== true) {
@@ -3319,6 +3318,27 @@ export async function apply(ctx, config) {
         }
       }
       return { welcome: saveGroupWelcome({ groupOpenid, enabled: wantsEnable, text: body.text }) }
+    }
+    if (action === 'join-answer-save') {
+      const current = state.joinAnswers[groupOpenid]
+      const wantsEnable = body.enabled === true
+      const question = String(body.question ?? '').slice(0, 200)
+      const answer = String(body.answer ?? '').slice(0, 200)
+      if (wantsEnable) {
+        if (answer.trim().length === 0) throw new Error('请先填写正确答案')
+        if (!(current && current.enabled === true)) {
+          // 打开功能需要申请（与其他群管开关一致）
+          assertFeaturesNotAllBlocked(groupOpenid)
+          return {
+            request: createGroupRequest({
+              groupOpenid,
+              kind: 'joinAnswer',
+              payload: { enabled: true, question, answer },
+            }),
+          }
+        }
+      }
+      return { joinAnswer: saveJoinAnswer({ groupOpenid, enabled: wantsEnable, question, answer }) }
     }
     if (action === 'join-verify-cancel') {
       let count = 0
@@ -3408,6 +3428,7 @@ export async function apply(ctx, config) {
     fortune: '打开今日运势',
     welcome: '打开入群欢迎',
     manager: '添加代管',
+    joinAnswer: '打开入群问答自动通过',
   }
 
   /** 打开某类功能 → 生成申请；关闭 → 直接生效。 */
@@ -3469,6 +3490,15 @@ export async function apply(ctx, config) {
     }
     if (request.kind === 'welcome') {
       saveGroupWelcome({ groupOpenid, enabled: true, text: payload.text })
+      return
+    }
+    if (request.kind === 'joinAnswer') {
+      saveJoinAnswer({
+        groupOpenid,
+        enabled: true,
+        question: payload.question,
+        answer: payload.answer,
+      })
       return
     }
     if (request.kind === 'manager') {
