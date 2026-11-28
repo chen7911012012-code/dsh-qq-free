@@ -3192,6 +3192,7 @@ export async function apply(ctx, config) {
           && (!Array.isArray(item.groups) || item.groups.length === 0 || item.groups.includes(groupOpenid)))
         .slice(-5),
       pendingRequests: state.groupChangeRequests.filter((item) => item.groupOpenid === groupOpenid),
+      joinAnswer: state.joinAnswers[groupOpenid] ?? { enabled: false, question: '', answer: '' },
       welcome: {
         ...getGroupWelcome(groupOpenid),
         joinNotice: liveConfig.joinNoticeEnabled !== false,
