@@ -247,6 +247,13 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
       </div>
 
       <div class="card">
+        <strong style="font-size:14px">入群问答自动通过</strong>
+        <div class="muted">入群申请里填写的答案与这里的答案一致就直接同意，不用人工审批；比较时忽略空格、大小写、全角半角。</div>
+        <div class="list" id="joinAnswerList"></div>
+        <div class="notice hidden" id="joinAnswerNotice"></div>
+      </div>
+
+      <div class="card">
         <strong style="font-size:14px">会话目标</strong>
         <div class="row">
           <select id="targetScope"><option value="group">群聊</option><option value="c2c">私聊</option></select>
@@ -299,6 +306,7 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
   var boardPick = []
   var paPick = []
   var wgEdit = {}
+  var jaEdit = {}
   var $ = function (id) { return document.getElementById(id) }
   function headers() { return { 'authorization': 'Bearer ' + token, 'content-type': 'application/json' } }
   function notice(el, text, kind) { el.className = 'notice' + (kind ? ' ' + kind : ''); el.textContent = text; el.classList.remove('hidden') }
@@ -485,13 +493,48 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
     }
 
     var requestList = $('groupRequestsList'); requestList.innerHTML = ''
+    var jaList = $('joinAnswerList'); jaList.innerHTML = ''
+    ;(state.targets || []).filter(function (t) { return t.scope === 'group' }).forEach(function (t) {
+      var rule = (state.joinAnswers || {})[t.openid]
+      var draft = jaEdit[t.openid] || {
+        enabled: rule ? rule.enabled === true : false,
+        question: rule ? String(rule.question || '') : '',
+        answer: rule ? String(rule.answer || '') : '',
+      }
+      jaEdit[t.openid] = draft
+      var div = document.createElement('div'); div.className = 'item'
+      var main = document.createElement('div'); main.className = 'item-main'
+      var q = document.createElement('div'); q.className = 'q'; q.textContent = t.name + (rule && rule.enabled ? ' · 已开启' : '')
+      var row = document.createElement('label'); row.className = 'row'
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.style.flex = '0 0 auto'; cb.checked = draft.enabled === true
+      cb.onchange = function () { draft.enabled = cb.checked }
+      var span = document.createElement('span'); span.textContent = '启用自动通过'
+      row.appendChild(cb); row.appendChild(span)
+      var question = document.createElement('input'); question.value = draft.question
+      question.placeholder = '问题（仅展示，例如：入群暗号是什么）'
+      question.oninput = function () { draft.question = question.value }
+      var answer = document.createElement('input'); answer.value = draft.answer
+      answer.placeholder = '正确答案（必填）'
+      answer.oninput = function () { draft.answer = answer.value }
+      var actions = document.createElement('div'); actions.className = 'item-actions'
+      var save = document.createElement('button'); save.className = 'sm'; save.textContent = '保存本群'
+      save.onclick = function () {
+        post('/api/joinAnswer', { action: 'save', groupOpenid: t.openid, enabled: draft.enabled === true, question: draft.question || '', answer: draft.answer || '' })
+          .then(function () { notice($('joinAnswerNotice'), '已保存「' + t.name + '」的入群问答', 'ok') })
+          .catch(function (e) { notice($('joinAnswerNotice'), e.message, 'err') })
+      }
+      actions.appendChild(save)
+      main.appendChild(q); main.appendChild(row); main.appendChild(question); main.appendChild(answer)
+      div.appendChild(main); div.appendChild(actions); jaList.appendChild(div)
+    })
+
     var featureNames = {
       chat: 'AI 聊天', auto: '自主发言', welcome: '入群欢迎', joinNotice: '入群申请通知',
       joinRequest: '入群申请处理', joinVerify: '入群人机验证', fortune: '今日运势',
       commands: '群管理命令', moderation: '违禁词', info: '获取信息',
     }
     ;(state.groupChangeRequests || []).forEach(function (req) {
-      var kindLabel = { features: '打开功能', joinVerify: '打开入群人机验证', cleanup: '打开沉默清理', fortune: '打开今日运势', welcome: '打开入群欢迎', manager: '添加代管' }[req.kind] || '未知申请'
+      var kindLabel = { features: '打开功能', joinVerify: '打开入群人机验证', cleanup: '打开沉默清理', fortune: '打开今日运势', welcome: '打开入群欢迎', manager: '添加代管', joinAnswer: '打开入群问答自动通过' }[req.kind] || '未知申请'
       var target = (state.targets || []).filter(function (t) { return t.openid === req.groupOpenid })[0]
       var groupName = req.groupName || (target && target.name) || '未知群'
       var memberName = '该成员'
@@ -508,7 +551,9 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
           ? '开启入群欢迎，文案：' + ((req.payload && req.payload.text) || '（空）')
           : req.kind === 'manager'
             ? '代管：' + memberName + '（' + String((req.payload && req.payload.memberOpenid) || '').slice(-6) + '）'
-            : req.kind === 'cleanup'
+            : req.kind === 'joinAnswer'
+              ? '问题：' + ((req.payload && req.payload.question) || '（未填写）') + ' · 答案：' + ((req.payload && req.payload.answer) || '')
+              : req.kind === 'cleanup'
               ? '开启清理 · ' + ((req.payload && req.payload.time) || '03:00') + ' · 未发言 ' + ((req.payload && req.payload.days) || 30) + ' 天'
               : '开启'
       var div = document.createElement('div'); div.className = 'item'
