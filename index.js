@@ -1377,8 +1377,20 @@ export async function apply(ctx, config) {
     return state.joinAnswers[openid]
   }
 
-  function joinAnswersMatch(rule, entry) {
-    const expected = normalizeAnswer(rule.answer)
+  function handleJoinAnswer(body) {
+    const action = String(body.action ?? 'list')
+    if (action === 'save') {
+      const groupOpenid = assertGroupOpenid(body.groupOpenid)
+      const enabled = body.enabled === true
+      const question = String(body.question ?? '').slice(0, 200)
+      const answer = String(body.answer ?? '').slice(0, 200)
+      if (enabled && answer.trim().length === 0) throw new Error('请先填写正确答案')
+      return { joinAnswer: saveJoinAnswer({ groupOpenid, enabled, question, answer }) }
+    }
+    return { list: state.joinAnswers }
+  }
+
+  function joinAnswersMatch(rule, entry) {    const expected = normalizeAnswer(rule.answer)
     if (expected.length === 0) return false
     const candidates = [entry.verifyMessage]
     for (const qa of entry.verifyQa ?? []) candidates.push(qa.answer)
