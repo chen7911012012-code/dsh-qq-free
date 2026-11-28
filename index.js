@@ -3191,32 +3191,38 @@ export async function apply(ctx, config) {
       return { ok: true }
     }
     if (action === 'save-blocks') {
-      const features = [...new Set((Array.isArray(body.features) ? body.features : [])
+      const requestedBlocked = [...new Set((Array.isArray(body.features) ? body.features : [])
         .map((item) => String(item))
         .filter((item) => GROUP_FEATURES.includes(item)))]
       const requestedAll = body.all === true
       const block = getGroupBlock(groupOpenid) ?? { all: false, features: [] }
       const currentAll = block.all === true
-      const currentBlocked = new Set(Array.isArray(block.features) ? block.features : [])
-      // 关闭功能（新增屏蔽 / 打开全部屏蔽）立即生效；打开功能才需要申请
-      if (requestedAll && !currentAll) {
-        handleGroupBlocks({ action: 'save', groupOpenid, all: true, features })
+      // 全部屏蔽 = 所有功能都关着
+      const currentBlocked = new Set(currentAll ? GROUP_FEATURES : (Array.isArray(block.features) ? block.features : []))
+      const desiredBlocked = new Set(requestedAll ? GROUP_FEATURES : requestedBlocked)
+      if (requestedAll) {
+        // 打开「全部屏蔽」＝关闭所有功能，直接生效
+        handleGroupBlocks({ action: 'save', groupOpenid, all: true, features: [] })
         return { ok: true, applied: true }
       }
-      const newlyBlocked = features.filter((item) => !currentBlocked.has(item))
-      const newlyUnblocked = [...currentBlocked].filter((item) => !features.includes(item))
-      if (newlyBlocked.length > 0 || currentAll) {
+      const newlyBlocked = [...desiredBlocked].filter((item) => !currentBlocked.has(item))
+      const newlyEnabled = [...currentBlocked].filter((item) => !desiredBlocked.has(item))
+      let applied = false
+      if (newlyBlocked.length > 0) {
+        // 关闭功能（新增屏蔽）立即生效
         handleGroupBlocks({
           action: 'save',
           groupOpenid,
           all: false,
           features: [...new Set([...currentBlocked, ...newlyBlocked])],
         })
+        applied = true
       }
-      if (newlyUnblocked.length > 0) {
+      if (newlyEnabled.length > 0) {
+        // 打开功能（含取消「全部屏蔽」）一律需要申请
         return {
-          applied: newlyBlocked.length > 0,
-          request: createGroupRequest({ groupOpenid, kind: 'features', payload: { unblock: newlyUnblocked } }),
+          applied,
+          request: createGroupRequest({ groupOpenid, kind: 'features', payload: { unblock: newlyEnabled } }),
         }
       }
       return { ok: true, applied: true }
@@ -3365,10 +3371,11 @@ export async function apply(ctx, config) {
     const groupOpenid = request.groupOpenid
     const payload = request.payload && typeof request.payload === 'object' ? request.payload : {}
     if (request.kind === 'features') {
-      // 只处理「打开」：把申请里的功能从本群屏蔽列表里去掉
+      // 只处理「打开」：把申请里的功能从本群屏蔽列表里去掉（全部屏蔽时按全部功能算）
       const unblock = Array.isArray(payload.unblock) ? payload.unblock : []
       const block = getGroupBlock(groupOpenid) ?? { all: false, features: [] }
-      const features = (Array.isArray(block.features) ? block.features : []).filter((item) => !unblock.includes(item))
+      const base = block.all === true ? new Set(GROUP_FEATURES) : new Set(Array.isArray(block.features) ? block.features : [])
+      const features = [...base].filter((item) => !unblock.includes(item))
       handleGroupBlocks({ action: 'save', groupOpenid, all: false, features })
       return
     }
