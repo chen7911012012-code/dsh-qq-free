@@ -949,6 +949,32 @@ const gpBadMention = await httpCall(`${remoteBase}/gapi/say?token=${encodeURICom
   method: 'POST', headers: { 'content-type': 'application/json' }, body: { text: '越权 @', mention: '12345' },
 })
 check('分群网页 @ 成员 openid 不合法会报错', gpBadMention.status === 400 && /openid/.test(String(gpBadMention.json().error ?? '')), JSON.stringify(gpBadMention.json()))
+
+// 分群网页发送图片
+const tinyPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+check('分群网页有发送图片控件', (await httpCall(`${remoteBase}/g/${encodeURIComponent(groupToken)}`)).text.includes('id="mediaFile"'))
+const beforeImage = sent.length
+const gpImage = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: { action: 'media', type: 1, data: tinyPng, fileName: 'test.png' },
+})
+check('分群网页可发送图片', gpImage.status === 200
+  && sent.slice(beforeImage).some((item) => item.target.endsWith(`/v2/groups/${GROUP}/files`) && item.body?.file_type === 1), JSON.stringify(gpImage.json()))
+const beforeImageCaption = sent.length
+const gpImageCaption = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: { action: 'media', type: 1, data: tinyPng, fileName: 'cap.png', caption: '看图', mention: 'MENTIONASKER1' },
+})
+const captionFrame = sent.slice(beforeImageCaption).find((item) => item.method === 'POST'
+  && item.target.endsWith(`/v2/groups/${GROUP}/messages`)
+  && String(item.body?.markdown?.content ?? '').includes('看图'))
+check('图片说明可以 @ 成员', gpImageCaption.status === 200
+  && String(captionFrame?.body?.markdown?.content ?? '').includes('<qqbot-at-user id="MENTIONASKER1"/>'), JSON.stringify(captionFrame?.body))
+const gpBadMediaMention = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: { action: 'media', type: 1, data: tinyPng, fileName: 'bad.png', mention: '123' },
+})
+check('发送图片时 @ 成员 openid 非法会报错', gpBadMediaMention.status === 400 && /openid/.test(String(gpBadMediaMention.json().error ?? '')))
 await call('/qq-free/config', 'POST', { dailyLimit: 10 })
 const mainStill = await httpCall(`${remoteBase}/api/state`, { headers: { authorization: 'Bearer test12' } })
 check('主网页不受分群权限限制', mainStill.status === 200)
