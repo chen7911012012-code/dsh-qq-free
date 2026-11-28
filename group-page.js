@@ -372,19 +372,27 @@ $('memberList').onclick = (event) => {
   if (button.dataset.kick) { if (confirm('确定踢出这个成员？')) act('kick', { memberOpenid: button.dataset.kick }); }
 };
 $('blockBtn').onclick = () => {
+  const allBlocked = data.blocks?.all === true;
   const all = $('featureGrid').querySelector('[data-feature="__all"]').checked;
-  const blocked = new Set(data.blocks?.features || []);
+  // 以「当前实际生效」的屏蔽集合为基准：全部屏蔽时所有功能都算关闭
+  const blocked = new Set(allBlocked ? (data.features || []) : (data.blocks?.features || []));
   for (const input of $('featureGrid').querySelectorAll('input[data-feature]:not([data-feature="__all"])')) {
     if (input.checked) blocked.delete(input.dataset.feature);
     else blocked.add(input.dataset.feature);
   }
-  act('save-blocks', { all, features: [...blocked] });
+  if (all) {
+    // 勾选「全部屏蔽」= 关闭所有功能，立即生效
+    act('save-blocks', { all: true, features: [] });
+    return;
+  }
+  act('save-blocks', { all: false, features: [...blocked] });
 };
 $('aiChatSave').onclick = () => {
-  const blocked = new Set(data.blocks?.features || []);
+  const allBlocked = data.blocks?.all === true;
+  const blocked = new Set(allBlocked ? (data.features || []) : (data.blocks?.features || []));
   if ($('aiChatOn').checked) blocked.delete('chat'); else blocked.add('chat');
   if ($('autoOn').checked) blocked.delete('auto'); else blocked.add('auto');
-  act('save-blocks', { all: false, features: [...blocked] });
+  act('save-blocks', { all: false, features: [...blocked, ].filter((key) => key === 'chat' || key === 'auto' || (data.features || []).includes(key)) });
 };
 $('welcomeBtn').onclick = () => act('welcome-save', { enabled: $('welcomeOn').checked, text: $('welcomeText').value });
 $('verifyBtn').onclick = () => act('join-verify-save', { enabled: $('verifyOn').checked });
