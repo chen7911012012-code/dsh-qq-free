@@ -426,23 +426,70 @@ $('aiChatSave').onclick = () => {
   act('save-blocks', { all: false, features: [...blocked] });
 };
 $('welcomeBtn').onclick = () => act('welcome-save', { enabled: $('welcomeOn').checked, text: $('welcomeText').value });
-// 发送图片：选图 → 读取 base64 → 走 media 动作
+// 发送图片：先在浏览器里压缩（手机原图动辄几 MB，走公网隧道很慢甚至超时），再走 media 动作
 let mediaFile = null;
-$('mediaFile').onchange = (event) => {
+function compressImage(file, maxDim, quality, maxBytes) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        const data = canvas.toDataURL('image/jpeg', quality);
+        URL.revokeObjectURL(url);
+        const size = Math.floor(data.length * 3 / 4);
+        if (size > maxBytes && quality > 0.5) {
+          resolve(compressImage(file, Math.round(maxDim * 0.8), 0.7, maxBytes));
+          return;
+        }
+        const base = String(file.name || 'image').replace(/\.[^.]*$/, '');
+        resolve({ data, name: base + '.jpg', size, width, height });
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+$('mediaFile').onchange = async (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
-  if (file.size > 5 * 1024 * 1024) { toast('图片超过 5MB'); event.target.value = ''; return; }
   if (file.type.indexOf('image/') !== 0) { toast('请选择图片文件'); event.target.value = ''; return; }
-  const reader = new FileReader();
-  reader.onload = () => {
-    mediaFile = { name: file.name, data: String(reader.result || '') };
-    $('mediaHint').textContent = '已选：' + file.name;
-  };
-  reader.readAsDataURL(file);
+  if (file.size > 20 * 1024 * 1024) { toast('图片太大（超过 20MB）'); event.target.value = ''; return; }
+  $('mediaHint').textContent = '正在压缩图片…';
+  const compressed = await compressImage(file, 1600, 0.85, 1.6 * 1024 * 1024);
+  if (!compressed) {
+    toast('这个图片格式浏览器读不了，请换 JPG / PNG');
+    $('mediaHint').textContent = '未选择文件';
+    event.target.value = '';
+    return;
+  }
+  if (compressed.size > 5 * 1024 * 1024) {
+    toast('压缩后仍超过 5MB，请换小一点的图片');
+    $('mediaHint').textContent = '未选择文件';
+    event.target.value = '';
+    return;
+  }
+  mediaFile = { name: compressed.name, data: compressed.data };
+  $('mediaHint').textContent = '已选：' + file.name
+    + '（压缩后 ' + (compressed.size / 1024 / 1024).toFixed(2) + 'MB，' + compressed.width + '×' + compressed.height + '）';
+  event.target.value = '';
 };
 $('mediaBtn').onclick = async () => {
   if (!mediaFile) { toast('先选一张图片'); return; }
   $('mediaBtn').disabled = true;
+  $('mediaBtn').textContent = '发送中…';
   try {
     const result = await act('media', {
       type: 1,
@@ -459,6 +506,7 @@ $('mediaBtn').onclick = async () => {
     }
   } finally {
     $('mediaBtn').disabled = false;
+    $('mediaBtn').textContent = '发送图片';
   }
 };
 $('joinAnswerSave').onclick = () => act('join-answer-save', {
