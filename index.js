@@ -3008,6 +3008,9 @@ export async function apply(ctx, config) {
       })
       return { saved: true }
     },
+    joinAnswer(body) {
+      return handleJoinAnswer(body)
+    },
     groupWelcome(body) {
       const action = String(body.action ?? 'save')
       if (action === 'save') {
@@ -4046,6 +4049,7 @@ export async function apply(ctx, config) {
         .sort((left, right) => String(right.date ?? '').localeCompare(String(left.date ?? '')))
         .slice(0, 100),
       joinVerifications: state.joinVerifications.map((item) => ({ groupOpenid: item.groupOpenid, memberOpenid: item.memberOpenid, name: item.name, expiresAt: item.expiresAt ?? 0, deferred: item.deferred === true })),
+      joinAnswers: state.joinAnswers,
       joinVerify: {
         enabled: liveConfig.joinVerifyEnabled === true,
         groups: Array.isArray(liveConfig.joinVerifyGroups) ? liveConfig.joinVerifyGroups : [],
