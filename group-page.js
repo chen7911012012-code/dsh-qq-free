@@ -98,6 +98,7 @@ section{display:none}section.on{display:block}
       <div class="grid" id="featureGrid"></div>
       <div class="row" style="margin-top:10px"><button id="blockBtn">保存功能开关</button></div>
       <p class="muted">打开功能需要申请（管理员同意后生效）；关闭功能立即生效。</p>
+      <p class="muted" id="allBlockedHint" style="display:none"></p>
       <p class="muted">关闭「入群申请处理」后，本群不再记录/通知入群申请；关闭「入群人机验证」后，本群新成员不验证。</p>
       <p class="muted" id="modPolicy">违禁词处罚：加载中…</p>
       <p class="muted" id="pendingRequests">分群网页改动申请：无</p>
@@ -308,15 +309,27 @@ function render() {
     mention.appendChild(option);
   }
   if (keepMention.length > 0 && mentioned.has(keepMention)) mention.value = keepMention;
-  $('featureGrid').innerHTML = (data.features || []).filter((key) => !CHAT_FEATURES.includes(key)).map((key) => '<label class="check"><input type="checkbox" data-feature="' + key + '" ' + ((data.blocks?.features || []).includes(key) ? '' : 'checked') + '> ' + (FEATURE_LABELS[key] || key) + '</label>').join('') + '<label class="check"><input type="checkbox" data-feature="__all" ' + (data.blocks?.all ? 'checked' : '') + '> 全部屏蔽</label>';
-  $('aiChatOn').checked = data.blocks?.all !== true && !(data.blocks?.features || []).includes('chat');
-  $('autoOn').checked = data.blocks?.all !== true && !(data.blocks?.features || []).includes('auto');
-  $('welcomeOn').checked = data.welcome?.enabled === true;
+  const allBlocked = data.blocks?.all === true;
+  const effectiveBlocked = new Set(allBlocked ? (data.features || []) : (data.blocks?.features || []));
+  $('featureGrid').innerHTML = (data.features || []).filter((key) => !CHAT_FEATURES.includes(key)).map((key) => '<label class="check"><input type="checkbox" data-feature="' + key + '" ' + (effectiveBlocked.has(key) ? '' : 'checked') + '> ' + (FEATURE_LABELS[key] || key) + '</label>').join('') + '<label class="check"><input type="checkbox" data-feature="__all" ' + (allBlocked ? 'checked' : '') + '> 全部屏蔽（关闭所有功能）</label>';
+  $('aiChatOn').checked = !effectiveBlocked.has('chat');
+  $('autoOn').checked = !effectiveBlocked.has('auto');
+  // 全部屏蔽时所有功能都是关闭状态；要开启必须申请
+  $('welcomeOn').checked = allBlocked ? false : data.welcome?.enabled === true;
   $('welcomeText').value = data.welcome?.text || '';
-  $('verifyOn').checked = data.joinVerify?.enabled === true;
-  $('cleanupOn').checked = data.cleanup?.enabled === true;
+  $('verifyOn').checked = allBlocked ? false : data.joinVerify?.enabled === true;
+  $('cleanupOn').checked = allBlocked ? false : data.cleanup?.enabled === true;
   $('cleanupTime').value = data.cleanup?.time || '03:00';
   $('cleanupDays').value = data.cleanup?.days || 30;
+  for (const id of ['welcomeOn', 'welcomeText', 'welcomeBtn', 'verifyOn', 'verifyBtn', 'cleanupOn', 'cleanupTime', 'cleanupDays', 'cleanupBtn', 'fortuneOn', 'fortuneSave']) {
+    const el = $(id);
+    if (el) el.disabled = allBlocked;
+  }
+  const allBlockedHint = $('allBlockedHint');
+  allBlockedHint.textContent = allBlocked
+    ? '本群已屏蔽全部功能（新加入的群默认如此）。要开启任何功能，需要先在「其他群功能开关」里勾选并申请，管理员同意后才生效。'
+    : '';
+  allBlockedHint.style.display = allBlocked ? 'block' : 'none';
   $('managerList').innerHTML = (data.managers || []).map((item) => '<li class="item"><div>' + esc(item.name || item.memberOpenid) + '<div class="muted">' + esc(item.memberOpenid) + '</div></div><button class="sm danger" data-manager-del="' + esc(item.memberOpenid) + '">取消</button></li>').join('');
   $('fortuneOn').checked = data.fortune?.enabled === true;
   const fortunes = data.fortune?.records || [];
