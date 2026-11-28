@@ -710,12 +710,71 @@ export const REMOTE_PAGE = String.raw`<!doctype html>
     } catch (e) { notice($('sendNotice'), e.message, 'err') } finally { $('mediaBtn').disabled = false }
   }
 
+  // 图片先压缩再上传：手机原图几 MB，走公网隧道会很慢
+  function compressImage(file, maxDim, quality, maxBytes) {
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(file)
+      var img = new Image()
+      img.onload = function () {
+        try {
+          var scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+          var width = Math.max(1, Math.round(img.width * scale))
+          var height = Math.max(1, Math.round(img.height * scale))
+          var canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          var ctx = canvas.getContext('2d')
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(0, 0, width, height)
+          ctx.drawImage(img, 0, 0, width, height)
+          var data = canvas.toDataURL('image/jpeg', quality)
+          URL.revokeObjectURL(url)
+          var size = Math.floor(data.length * 3 / 4)
+          if (size > maxBytes && quality > 0.5) {
+            resolve(compressImage(file, Math.round(maxDim * 0.8), 0.7, maxBytes))
+            return
+          }
+          var base = String(file.name || 'image').replace(/\.[^.]*$/, '')
+          resolve({ data: data, name: base + '.jpg', size: size, width: width, height: height })
+        } catch (error) {
+          URL.revokeObjectURL(url)
+          resolve(null)
+        }
+      }
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(null) }
+      img.src = url
+    })
+  }
+
   $('mediaFile').onchange = function (event) {
     var file = event.target.files && event.target.files[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { notice($('sendNotice'), '文件超过 5MB', 'err'); event.target.value = ''; return }
     var mime = file.type || ''
     var type = mime.indexOf('image/') === 0 ? 1 : mime.indexOf('video/') === 0 ? 2 : mime.indexOf('audio/') === 0 ? 3 : 4
+    if (type === 1) {
+      if (file.size > 20 * 1024 * 1024) { notice($('sendNotice'), '图片太大（超过 20MB）', 'err'); event.target.value = ''; return }
+      $('mediaHint').textContent = '正在压缩图片…'
+      compressImage(file, 1600, 0.85, 1.6 * 1024 * 1024).then(function (compressed) {
+        if (!compressed) {
+          notice($('sendNotice'), '这个图片格式浏览器读不了，请换 JPG / PNG', 'err')
+          $('mediaHint').textContent = '未选择文件'
+          event.target.value = ''
+          return
+        }
+        if (compressed.size > 5 * 1024 * 1024) {
+          notice($('sendNotice'), '压缩后仍超过 5MB', 'err')
+          $('mediaHint').textContent = '未选择文件'
+          event.target.value = ''
+          return
+        }
+        mediaFile = { name: compressed.name, type: 1, data: compressed.data }
+        $('mediaHint').textContent = '已选：' + file.name
+          + '（压缩后 ' + (compressed.size / 1024 / 1024).toFixed(2) + 'MB，' + compressed.width + '×' + compressed.height + '）'
+        event.target.value = ''
+      })
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) { notice($('sendNotice'), '文件超过 5MB', 'err'); event.target.value = ''; return }
     var reader = new FileReader()
     reader.onload = function () { mediaFile = { name: file.name, type: type, data: String(reader.result || '') }; $('mediaHint').textContent = '已选：' + file.name }
     reader.readAsDataURL(file)
