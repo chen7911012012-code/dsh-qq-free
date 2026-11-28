@@ -260,6 +260,8 @@ window.__ModuleLoader__.load({
       const [paForm, setPaForm] = useState({ text: '', mode: 'once', groups: [] })
       // 每个群的欢迎设置（面板逐群编辑）
       const [wgForms, setWgForms] = useState(null)
+      // 每个群的入群问答自动通过
+      const [jaForms, setJaForms] = useState(null)
       const [ownerId, setOwnerId] = useState(null)
       const [gmGroup, setGmGroup] = useState('')
       const [gmMember, setGmMember] = useState('')
@@ -403,6 +405,18 @@ window.__ModuleLoader__.load({
             }
           }
           setWgForms(rows)
+        }
+        if (jaForms === null && data.joinAnswers) {
+          const rows = {}
+          for (const target of (data.targets || []).filter((item) => item.scope === 'group')) {
+            const rule = data.joinAnswers[target.openid]
+            rows[target.openid] = {
+              enabled: rule?.enabled === true,
+              question: rule?.question || '',
+              answer: rule?.answer || '',
+            }
+          }
+          setJaForms(rows)
         }
         if (adminGroup === '') {
           const firstGroup = (data.targets || []).find((target) => target.scope === 'group')
@@ -1030,6 +1044,18 @@ window.__ModuleLoader__.load({
         if (result !== null) {
           flash('ok', action === 'push' ? `已同步 ${result.result?.synced ?? 0} 个文件到 GitHub` : 'GitHub 同步设置已保存')
         }
+      }
+
+      async function saveJoinAnswer(target) {
+        const row = jaForms?.[target.openid] ?? { enabled: false, question: '', answer: '' }
+        const result = await run(`join-answer-${target.openid}`, () => request('/qq-free/join-answer', {
+          action: 'save',
+          groupOpenid: target.openid,
+          enabled: row.enabled === true,
+          question: row.question ?? '',
+          answer: row.answer ?? '',
+        }))
+        if (result !== null) flash('ok', `已保存「${target.name}」的入群问答。`)
       }
 
       async function saveGroupWelcome(target) {
@@ -1671,6 +1697,39 @@ window.__ModuleLoader__.load({
                   })),
 
               h('div', { className: 'qqf-split' }),
+              h('p', { className: 'qqf-hint' }, '入群问答自动通过（每群独立）：开启后，入群申请里填写的答案与下面答案一致就直接同意，不用人工审批；答案按忽略空格/大小写/全角半角比较。'),
+              groupTargets.length === 0
+                ? h('p', { className: 'qqf-empty' }, '还没有群目标。')
+                : h('ul', { className: 'qqf-targets' },
+                  groupTargets.map((target) => {
+                    const row = jaForms?.[target.openid] ?? { enabled: false, question: '', answer: '' }
+                    return h('li', { key: target.id, className: 'qqf-target' },
+                      h('div', { className: 'qqf-target-main' },
+                        h('span', { className: 'qqf-target-name' }, target.name),
+                        h('label', { className: 'qqf-row' },
+                          h('input', {
+                            type: 'checkbox', checked: row.enabled === true,
+                            onChange: (event) => setJaForms({ ...jaForms, [target.openid]: { ...row, enabled: event.target.checked } }),
+                          }),
+                          h('span', null, '启用本群自动通过')),
+                        h('input', {
+                          className: 'qqf-input', value: row.question ?? '',
+                          placeholder: '问题（仅展示给管理员看，例如：入群暗号是什么）',
+                          onChange: (event) => setJaForms({ ...jaForms, [target.openid]: { ...row, question: event.target.value } }),
+                        }),
+                        h('input', {
+                          className: 'qqf-input', value: row.answer ?? '',
+                          placeholder: '正确答案（必填）',
+                          onChange: (event) => setJaForms({ ...jaForms, [target.openid]: { ...row, answer: event.target.value } }),
+                        })),
+                      h('div', { className: 'qqf-row' },
+                        h('button', {
+                          className: 'qqf-btn qqf-btn--sm', disabled: busy !== '',
+                          onClick: () => void saveJoinAnswer(target),
+                        }, busy === `join-answer-${target.openid}` ? '保存中…' : '保存本群')))
+                  })),
+
+              h('div', { className: 'qqf-split' }),
               h('div', { className: 'qqf-row' },
                 h('select', {
                   className: 'qqf-select qqf-grow', value: adminGroup, 'aria-label': '管理群',
@@ -1772,6 +1831,7 @@ window.__ModuleLoader__.load({
                       fortune: '打开今日运势',
                       welcome: '打开入群欢迎',
                       manager: '添加代管',
+                      joinAnswer: '打开入群问答自动通过',
                     }[entry.kind] || '未知申请'
                     const groupTarget = (data.targets || []).find((target) => target.openid === entry.groupOpenid)
                     const groupName = entry.groupName || groupTarget?.name || '未知群'
@@ -1786,7 +1846,9 @@ window.__ModuleLoader__.load({
                         ? `开启入群欢迎，文案：${entry.payload?.text || '（空）'}`
                         : entry.kind === 'manager'
                           ? `代管：${memberName}（${String(entry.payload?.memberOpenid || '').slice(-6)}）`
-                          : entry.kind === 'cleanup'
+                          : entry.kind === 'joinAnswer'
+                            ? `问题：${entry.payload?.question || '（未填写）'} · 答案：${entry.payload?.answer || ''}`
+                            : entry.kind === 'cleanup'
                             ? `开启清理 · ${entry.payload?.time || '03:00'} · 未发言 ${entry.payload?.days || 30} 天`
                             : '开启'
                     return h('li', { key: entry.id, className: 'qqf-target' },
