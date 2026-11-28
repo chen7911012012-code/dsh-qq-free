@@ -1057,6 +1057,26 @@ const gpWelcomeOn = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIC
 check('分群网页打开本群欢迎需要申请', Boolean(gpWelcomeOn.json().request) && gpWelcomeOn.json().request.kind === 'welcome')
 const welcomeApprove = await call('/qq-free/group-requests', 'POST', { action: 'approve', id: gpWelcomeOn.json().request.id })
 check('同意后本群欢迎打开', welcomeApprove.status === 200 && welcomeApprove.body.state.welcome.perGroup[GROUP]?.enabled === true)
+
+// 入群问答自动通过：分群网页打开要申请，关闭立即生效；主网页可直接保存
+const gpJaReq = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'join-answer-save', enabled: true, question: '暗号是', answer: '开门' },
+})
+check('分群网页打开入群问答只生成申请', Boolean(gpJaReq.json().request) && gpJaReq.json().request.kind === 'joinAnswer'
+  && gpJaReq.json().request.payload.answer === '开门')
+const jaApprove = await call('/qq-free/group-requests', 'POST', { action: 'approve', id: gpJaReq.json().request.id })
+check('同意后本群入群问答生效', jaApprove.status === 200
+  && jaApprove.body.state.joinAnswers[GROUP]?.enabled === true
+  && jaApprove.body.state.joinAnswers[GROUP]?.answer === '开门')
+const gpJaOff = await httpCall(`${remoteBase}/gapi/action?token=${encodeURIComponent(groupToken)}`, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: { action: 'join-answer-save', enabled: false, question: '暗号是', answer: '开门' },
+})
+check('分群网页关闭入群问答立即生效', !gpJaOff.json().request && ((await call('/qq-free/state')).body.joinAnswers[GROUP] || {}).enabled === false)
+const jaRemote = await httpCall(`${remoteBase}/api/joinAnswer`, {
+  method: 'POST', headers: { authorization: 'Bearer test12', 'content-type': 'application/json' },
+  body: { action: 'save', groupOpenid: GROUP, enabled: false, question: '改一下', answer: '新答案' },
+})
+check('主网页可保存入群问答', jaRemote.status === 200 && jaRemote.json().joinAnswer?.answer === '新答案')
 await call('/qq-free/group-pages', 'POST', { action: 'save', groupOpenid: GROUP, say: true, expiresAt: '2020-01-01T00:00:00.000Z' })
 const gpExpired = await httpCall(`${remoteBase}/g/${encodeURIComponent(groupToken)}`)
 check('分群网页过期', gpExpired.status === 410)
