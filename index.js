@@ -3248,9 +3248,12 @@ export async function apply(ctx, config) {
       return { results }
     }
     if (action === 'media') {
+      const caption = typeof body.caption === 'string' ? body.caption : ''
+      const mention = String(body.mention ?? '').trim()
+      if (mention.length > 0 && !/^[A-Za-z0-9_-]{8,}$/.test(mention)) throw new Error('@成员 openid 不合法')
       const results = await sendMediaTargets(`group:${groupOpenid}`, {
         type: body.type, url: body.url, data: body.data, fileName: body.fileName,
-      }, typeof body.caption === 'string' ? body.caption : '')
+      }, caption, mention.length > 0 ? mention : '')
       return { results }
     }
     if (action === 'join-approve') {
