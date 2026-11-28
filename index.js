@@ -3232,6 +3232,7 @@ export async function apply(ctx, config) {
       const current = getGroupWelcome(groupOpenid)
       const wantsEnable = body.enabled === true
       if (wantsEnable && current.enabled !== true) {
+        assertFeaturesNotAllBlocked(groupOpenid)
         return {
           request: createGroupRequest({
             groupOpenid,
@@ -3314,6 +3315,7 @@ export async function apply(ctx, config) {
         applyGroupRequest({ groupOpenid, kind: 'cleanup', payload })
         return { ok: true, applied: true }
       }
+      assertFeaturesNotAllBlocked(groupOpenid)
       return { request: createGroupRequest({ groupOpenid, kind: 'cleanup', payload }) }
     }
     if (action === 'group-info') {
@@ -3334,10 +3336,19 @@ export async function apply(ctx, config) {
   /** 打开某类功能 → 生成申请；关闭 → 直接生效。 */
   function requestOrApplyToggle(groupOpenid, kind, enabled) {
     if (enabled === true) {
+      assertFeaturesNotAllBlocked(groupOpenid)
       return { request: createGroupRequest({ groupOpenid, kind, payload: { enabled: true } }) }
     }
     applyGroupRequest({ groupOpenid, kind, payload: { enabled: false } })
     return { ok: true, applied: true }
+  }
+
+  /** 群被「全部屏蔽」时，所有功能都关着：要开启任何功能都必须先申请。 */
+  function assertFeaturesNotAllBlocked(groupOpenid) {
+    const block = getGroupBlock(groupOpenid)
+    if (block && block.all === true) {
+      throw new Error('本群已屏蔽全部功能，请先在「功能开关」里申请开启对应功能')
+    }
   }
 
   /** 分群网页的权限/开关改动只生成申请，等面板或主网页同意后才真正生效。 */
