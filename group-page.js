@@ -73,6 +73,14 @@ section{display:none}section.on{display:block}
       <div class="row" style="margin-top:8px"><button id="sayBtn">发送</button></div>
     </div>
     <div class="card">
+      <h2>发送图片 / 表情包</h2>
+      <p class="muted">从手机相册或电脑选一张图片（≤5MB），发送到本群；可选说明文字，会单独再发一条并带上「@ 群成员」里选的成员。</p>
+      <input type="file" id="mediaFile" accept="image/*">
+      <p class="muted" id="mediaHint">未选择文件</p>
+      <input id="mediaCaption" placeholder="说明文字（可选）">
+      <div class="row" style="margin-top:8px"><button id="mediaBtn">发送图片</button></div>
+    </div>
+    <div class="card">
       <h2>DeepSeek 代写</h2>
       <input id="topic" placeholder="输入主题，让 DeepSeek 写一句发到群里">
       <p class="muted">会沿用上面「@ 群成员」里选中的成员。</p>
@@ -318,6 +326,12 @@ function render() {
   }
   if (keepMention.length > 0 && mentioned.has(keepMention)) mention.value = keepMention;
   const allBlocked = data.blocks?.all === true;
+  const canSay = p.say === true && !allBlocked;
+  for (const id of ['mediaFile', 'mediaCaption', 'mediaBtn']) {
+    const el = $(id);
+    if (el) el.disabled = !canSay;
+  }
+  if (!canSay) $('mediaHint').textContent = allBlocked ? '本群已屏蔽全部功能，先申请开启后再发送' : '没有发言权限';
   const effectiveBlocked = new Set(allBlocked ? (data.features || []) : (data.blocks?.features || []));
   $('featureGrid').innerHTML = (data.features || []).filter((key) => !CHAT_FEATURES.includes(key)).map((key) => '<label class="check"><input type="checkbox" data-feature="' + key + '" ' + (effectiveBlocked.has(key) ? '' : 'checked') + '> ' + (FEATURE_LABELS[key] || key) + '</label>').join('') + '<label class="check"><input type="checkbox" data-feature="__all" ' + (allBlocked ? 'checked' : '') + '> 全部屏蔽（关闭所有功能）</label>';
   $('aiChatOn').checked = !effectiveBlocked.has('chat');
@@ -412,6 +426,41 @@ $('aiChatSave').onclick = () => {
   act('save-blocks', { all: false, features: [...blocked] });
 };
 $('welcomeBtn').onclick = () => act('welcome-save', { enabled: $('welcomeOn').checked, text: $('welcomeText').value });
+// 发送图片：选图 → 读取 base64 → 走 media 动作
+let mediaFile = null;
+$('mediaFile').onchange = (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('图片超过 5MB'); event.target.value = ''; return; }
+  if (!/^image\//.test(file.type || '')) { toast('请选择图片文件'); event.target.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    mediaFile = { name: file.name, data: String(reader.result || '') };
+    $('mediaHint').textContent = '已选：' + file.name;
+  };
+  reader.readAsDataURL(file);
+};
+$('mediaBtn').onclick = async () => {
+  if (!mediaFile) { toast('先选一张图片'); return; }
+  $('mediaBtn').disabled = true;
+  try {
+    const result = await act('media', {
+      type: 1,
+      data: mediaFile.data,
+      fileName: mediaFile.name,
+      caption: $('mediaCaption').value.trim(),
+      mention: $('mention').value || '',
+    });
+    if (result) {
+      mediaFile = null;
+      $('mediaHint').textContent = '未选择文件';
+      $('mediaCaption').value = '';
+      $('mediaFile').value = '';
+    }
+  } finally {
+    $('mediaBtn').disabled = false;
+  }
+};
 $('joinAnswerSave').onclick = () => act('join-answer-save', {
   enabled: $('joinAnswerOn').checked,
   question: $('joinAnswerQuestion').value,
